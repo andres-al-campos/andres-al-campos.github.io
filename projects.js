@@ -42,7 +42,7 @@ const PROJECTS = [
     name: "Ansa",
     tagline: "Break tasks down until the leaves are small enough to do.",
     blurb:
-      "A Workflowy-style outliner backed by a single SQLite source of truth. The React app and an MCP server are both just clients of the same REST API, so a Claude and a person can edit the same tree at once and see each other's changes live over SSE.",
+      "A Workflowy-style outliner backed by a single SQLite source of truth. The React app and an MCP server are peer clients of the same REST API, so a Claude and a person can edit the same tree at once, over SSE, without diverging.",
     tags: ["React", "TypeScript", "Fastify", "MCP"],
     platform: "tools",
     repo: "https://github.com/Id3arium/Ansa",
