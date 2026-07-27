@@ -1,6 +1,6 @@
 # Portfolio
 
-The site at [id3arium.github.io](https://id3arium.github.io). Static — no build step,
+The site at [andres-al-campos.github.io](https://andres-al-campos.github.io). Static — no build step,
 no dependencies. Push to `main` and GitHub Pages serves it.
 
 ## Adding a project
@@ -15,7 +15,7 @@ builds the cards and the filter row from that array.
   blurb: "One to three sentences: what it does and why it exists.",
   tags: ["Swift", "SwiftUI"],
   platform: "macos",              // browser | macos | ios | tools
-  repo: "https://github.com/Id3arium/Thing",
+  repo: "https://github.com/andres-al-campos/Thing",
   image: "img/thing.png",         // optional — omit for a text-only card
 }
 ```

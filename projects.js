@@ -16,7 +16,7 @@ const PROJECTS = [
       "A Firefox extension that tracks how long you spend on each site and puts a small timer in the corner of the screen. It uses session-based browsing — focused sessions, gentle nudges, and a cooldown when a limit is reached.",
     tags: ["Firefox extension", "TypeScript"],
     platform: "browser",
-    repo: "https://github.com/Id3arium/WebTime",
+    repo: "https://github.com/andres-al-campos/WebTime",
     image: "img/webtime.png",
   },
   {
@@ -26,7 +26,7 @@ const PROJECTS = [
       "A Firefox extension that scrapes every review from a Google Maps location and scores it for fake-review patterns — bimodal star distributions, date clustering, spelling anomalies. Built for apartment hunting; it ranks locations side by side once you've gathered a few.",
     tags: ["Firefox extension", "JavaScript", "statistics"],
     platform: "browser",
-    repo: "https://github.com/Id3arium/Momus",
+    repo: "https://github.com/andres-al-campos/Momus",
     image: "img/momus.png",
   },
   {
@@ -36,7 +36,7 @@ const PROJECTS = [
       "Captures your Claude.ai history and turns it into a durable, searchable record: every conversation gets a markdown summary, and those roll up into half-month, quarter, and year entries. An MCP server lets Claude read back through it. Everything runs locally.",
     tags: ["Python", "MCP", "Firefox extension"],
     platform: "tools",
-    repo: "https://github.com/Id3arium/Chronicle",
+    repo: "https://github.com/andres-al-campos/Chronicle",
   },
   {
     name: "Ansa",
@@ -45,7 +45,7 @@ const PROJECTS = [
       "A Workflowy-style outliner backed by a single SQLite source of truth. The React app and an MCP server are peer clients of the same REST API, so a Claude and a person can edit the same tree at once, over SSE, without diverging.",
     tags: ["React", "TypeScript", "Fastify", "MCP"],
     platform: "tools",
-    repo: "https://github.com/Id3arium/Ansa",
+    repo: "https://github.com/andres-al-campos/Ansa",
   },
   {
     name: "Winnow",
@@ -54,7 +54,7 @@ const PROJECTS = [
       "A high average rating is cheap — most things north of 4.0 are propped up by review pushes. Winnow scores each company on whether its review distribution looks organically produced, then lets the genuine outlier fall out: high average and a trustworthy statistical signature.",
     tags: ["Python", "statistics", "scraping"],
     platform: "tools",
-    repo: "https://github.com/Id3arium/Winnow",
+    repo: "https://github.com/andres-al-campos/Winnow",
   },
   {
     name: "Etymon",
@@ -63,7 +63,7 @@ const PROJECTS = [
       "A word-connection engine built on GloVe embeddings. Give it a set of words and it surfaces the strongest shared association across all of them — running fast set intersection and deeper graph traversal in parallel, then ranking every candidate by its strongest link.",
     tags: ["Python", "embeddings", "NLP"],
     platform: "tools",
-    repo: "https://github.com/Id3arium/Etymon",
+    repo: "https://github.com/andres-al-campos/Etymon",
     image: "img/etymon.png",
   },
   {
@@ -73,7 +73,7 @@ const PROJECTS = [
       "A macOS menu bar app that schedules monitor brightness, contrast, and Night Shift by time of day, interpolating smoothly between presets. It drives the real hardware backlight over DDC rather than dimming with a software overlay.",
     tags: ["Swift", "SwiftUI", "DDC"],
     platform: "macos",
-    repo: "https://github.com/Id3arium/Sundial",
+    repo: "https://github.com/andres-al-campos/Sundial",
   },
   {
     name: "ReSign",
@@ -82,7 +82,7 @@ const PROJECTS = [
       "A macOS menu bar app that watches your Xcode projects and automatically rebuilds and reinstalls them to your iPhone before their signatures expire. It checks on launch, every two hours, and whenever the Mac wakes.",
     tags: ["Swift", "SwiftUI", "devicectl"],
     platform: "macos",
-    repo: "https://github.com/Id3arium/ReSign",
+    repo: "https://github.com/andres-al-campos/ReSign",
   },
   {
     name: "Somnya",
@@ -91,7 +91,7 @@ const PROJECTS = [
       "An on-device iPhone sleep tracker that senses movement, breathing, and heartbeat overnight and reports what it actually measured. Lying awake still looks identical to deep sleep on an accelerometer, so every stat carries a tier: sensor fact, honest estimate, or not enough data.",
     tags: ["Swift", "SwiftData", "signal processing"],
     platform: "ios",
-    repo: "https://github.com/Id3arium/Somnya",
+    repo: "https://github.com/andres-al-campos/Somnya",
   },
   {
     name: "Timekeep",
@@ -100,7 +100,7 @@ const PROJECTS = [
       "Apple's Screen Time says you spent 47 minutes in a messaging app. It won't say whether that was one stretch at 2am or six check-ins. Timekeep reconstructs the real timeline from Shortcuts automations, and nothing leaves the phone.",
     tags: ["Swift", "SwiftData", "Shortcuts"],
     platform: "ios",
-    repo: "https://github.com/Id3arium/Timekeep",
+    repo: "https://github.com/andres-al-campos/Timekeep",
   },
   {
     name: "Almanac",
@@ -109,6 +109,6 @@ const PROJECTS = [
       "STRC pays a dividend twice a month, and the date you have to buy by shifts around weekends and NYSE holidays. Almanac computes those buy dates and schedules local notifications at market open. Offline, no dependencies, no account.",
     tags: ["Swift", "SwiftUI"],
     platform: "ios",
-    repo: "https://github.com/Id3arium/Almanac",
+    repo: "https://github.com/andres-al-campos/Almanac",
   },
 ];
