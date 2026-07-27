@@ -115,23 +115,26 @@ body {
 
 /* ---- grid ---- */
 
-/* align-items: start lets each card take its natural height. Without it a
-   text-only card stretches to match an image card beside it and ends up
-   mostly empty space. */
+/* Masonry via CSS columns rather than grid. Cards vary a lot in height — a
+   card with a screenshot is roughly twice a text-only one — and in a grid
+   every row would start level with the tallest card above it, leaving big
+   gaps. Columns let each card sit directly under the previous one. */
 .grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(18px, 2.4vw, 28px);
-  align-items: start;
+  column-count: 2;
+  column-gap: clamp(18px, 2.4vw, 28px);
 }
 
 @media (max-width: 720px) {
-  .grid { grid-template-columns: minmax(0, 1fr); }
+  .grid { column-count: 1; }
 }
 
+/* break-inside stops a card from being split across the column boundary.
+   Block rather than flex — a flex container is unreliable to keep intact
+   across a column break in some engines. */
 .card {
-  display: flex;
-  flex-direction: column;
+  display: block;
+  break-inside: avoid;
+  margin-bottom: clamp(18px, 2.4vw, 28px);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -171,9 +174,6 @@ body {
 }
 
 .body {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
   padding: 24px 24px 22px;
 }
 
@@ -218,9 +218,8 @@ body {
   padding: 6px 9px;
 }
 
-/* Pushed to the bottom so every card's link sits on the same baseline. */
 .repo {
-  margin-top: auto;
+  display: block;
   padding-top: 20px;
   font-size: 14px;
   color: var(--accent);
