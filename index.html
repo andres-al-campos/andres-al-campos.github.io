@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alejandro Campos — tools</title>
+<meta name="description" content="Browser extensions, menu bar apps, and small tools for measuring and reclaiming your own time and attention.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="masthead">
+  <h1>Alejandro Campos</h1>
+  <p class="intro">
+    I build small tools that measure things I couldn't otherwise see — where my
+    time goes, whether a rating is honest, what I actually said six months ago —
+    and then give me some control over them. Browser extensions, menu bar apps,
+    iPhone apps, and command-line pipelines. Everything here runs locally.
+  </p>
+  <p class="links">
+    <a href="https://github.com/Id3arium">GitHub</a>
+    <a href="mailto:id3arium@gmail.com">Email</a>
+  </p>
+</header>
+
+<main>
+  <nav class="filters" id="filters" aria-label="Filter projects by platform"></nav>
+  <div class="grid" id="grid"></div>
+  <p class="empty" id="empty" hidden>Nothing here yet.</p>
+</main>
+
+<footer>
+  <p>Built as a static page. <a href="https://github.com/Id3arium/Id3arium.github.io">Source</a>.</p>
+</footer>
+
+<script src="projects.js"></script>
+<script>
+(function () {
+  var grid = document.getElementById('grid');
+  var filters = document.getElementById('filters');
+  var empty = document.getElementById('empty');
+
+  var LABELS = {
+    all: 'All',
+    browser: 'Browser',
+    macos: 'macOS',
+    ios: 'iPhone',
+    tools: 'Tools'
+  };
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text) n.textContent = text;
+    return n;
+  }
+
+  function card(p) {
+    var a = el('a', 'card');
+    a.href = p.repo;
+    a.rel = 'noopener';
+
+    if (p.image) {
+      var shot = el('div', 'shot');
+      var img = el('img');
+      img.src = p.image;
+      img.alt = p.name + ' screenshot';
+      img.loading = 'lazy';
+      shot.appendChild(img);
+      a.appendChild(shot);
+    } else {
+      a.classList.add('no-shot');
+    }
+
+    var body = el('div', 'body');
+    body.appendChild(el('h2', null, p.name));
+    body.appendChild(el('p', 'tagline', p.tagline));
+    body.appendChild(el('p', 'blurb', p.blurb));
+
+    var tags = el('ul', 'tags');
+    p.tags.forEach(function (t) { tags.appendChild(el('li', null, t)); });
+    body.appendChild(tags);
+
+    body.appendChild(el('span', 'repo', 'View on GitHub'));
+    a.appendChild(body);
+    return a;
+  }
+
+  function render(platform) {
+    grid.textContent = '';
+    var shown = PROJECTS.filter(function (p) {
+      return platform === 'all' || p.platform === platform;
+    });
+    shown.forEach(function (p) { grid.appendChild(card(p)); });
+    empty.hidden = shown.length > 0;
+  }
+
+  // Build the filter row from the platforms actually present, in a fixed order.
+  var present = ['browser', 'macos', 'ios', 'tools'].filter(function (k) {
+    return PROJECTS.some(function (p) { return p.platform === k; });
+  });
+
+  ['all'].concat(present).forEach(function (key, i) {
+    var b = el('button', null, LABELS[key]);
+    b.type = 'button';
+    b.dataset.platform = key;
+    if (i === 0) b.setAttribute('aria-current', 'true');
+    b.addEventListener('click', function () {
+      filters.querySelectorAll('button').forEach(function (o) {
+        o.removeAttribute('aria-current');
+      });
+      b.setAttribute('aria-current', 'true');
+      render(key);
+    });
+    filters.appendChild(b);
+  });
+
+  render('all');
+})();
+</script>
+
+</body>
+</html>

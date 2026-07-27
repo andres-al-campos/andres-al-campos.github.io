@@ -1,0 +1,244 @@
+:root {
+  --bg: #fbfaf8;
+  --surface: #ffffff;
+  --ink: #1a1a18;
+  --ink-soft: #55534e;
+  --ink-faint: #85827b;
+  --line: #e5e2db;
+  --accent: #3f5d9c;
+  --chip: #f1efe9;
+  --shadow: 0 1px 2px rgba(26, 26, 24, .04), 0 6px 20px rgba(26, 26, 24, .05);
+  --shadow-lift: 0 2px 4px rgba(26, 26, 24, .05), 0 14px 36px rgba(26, 26, 24, .09);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14151a;
+    --surface: #1b1d23;
+    --ink: #eceae5;
+    --ink-soft: #a8a59e;
+    --ink-faint: #78756f;
+    --line: #2b2e36;
+    --accent: #8fabe4;
+    --chip: #23262e;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .28);
+    --shadow-lift: 0 2px 4px rgba(0, 0, 0, .34), 0 14px 36px rgba(0, 0, 0, .42);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 17px/1.6 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  padding: 0 clamp(20px, 5vw, 40px);
+}
+
+.masthead, main, footer {
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+/* ---- masthead ---- */
+
+.masthead { padding: clamp(64px, 11vw, 128px) 0 clamp(32px, 5vw, 56px); }
+
+.masthead h1 {
+  margin: 0 0 20px;
+  font-size: clamp(34px, 5.4vw, 52px);
+  line-height: 1.1;
+  letter-spacing: -.022em;
+  font-weight: 600;
+}
+
+.intro {
+  max-width: 60ch;
+  margin: 0;
+  font-size: clamp(17px, 2vw, 19px);
+  color: var(--ink-soft);
+}
+
+.links {
+  margin: 28px 0 0;
+  display: flex;
+  gap: 22px;
+  font-size: 15px;
+}
+
+.links a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+}
+
+.links a:hover { border-bottom-color: currentColor; }
+
+/* ---- filters ---- */
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 0 32px;
+}
+
+.filters button {
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+
+.filters button:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+.filters button[aria-current="true"] {
+  color: var(--bg);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.filters button:focus-visible,
+.card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* ---- grid ---- */
+
+/* align-items: start lets each card take its natural height. Without it a
+   text-only card stretches to match an image card beside it and ends up
+   mostly empty space. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(18px, 2.4vw, 28px);
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: var(--shadow);
+  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+  border-color: var(--ink-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+  .card:hover { transform: none; }
+}
+
+/* Screenshots vary a lot in shape — a wide dashboard, a tall extension popup.
+   A fixed frame would either crop the tall ones or float them in dead space,
+   so the image sets its own height and just caps how tall it can get. */
+.shot {
+  background: var(--chip);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.shot img {
+  max-width: 100%;
+  max-height: 420px;
+  display: block;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 24px 24px 22px;
+}
+
+/* Text-only cards carry the weight themselves, so give them more room. */
+.no-shot .body { padding-top: 30px; }
+
+.card h2 {
+  margin: 0;
+  font-size: 21px;
+  letter-spacing: -.012em;
+  font-weight: 600;
+}
+
+.tagline {
+  margin: 5px 0 0;
+  font-size: 15px;
+  color: var(--accent);
+}
+
+.blurb {
+  margin: 14px 0 0;
+  font-size: 15.5px;
+  line-height: 1.62;
+  color: var(--ink-soft);
+}
+
+.tags {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 20px 0 0;
+  padding: 0;
+}
+
+.tags li {
+  font-size: 12.5px;
+  line-height: 1;
+  color: var(--ink-faint);
+  background: var(--chip);
+  border-radius: 5px;
+  padding: 6px 9px;
+}
+
+/* Pushed to the bottom so every card's link sits on the same baseline. */
+.repo {
+  margin-top: auto;
+  padding-top: 20px;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.card:hover .repo { text-decoration: underline; }
+
+.empty {
+  color: var(--ink-faint);
+  padding: 40px 0;
+}
+
+/* ---- footer ---- */
+
+footer {
+  padding: clamp(56px, 9vw, 96px) 0 48px;
+  font-size: 14px;
+  color: var(--ink-faint);
+}
+
+footer a { color: inherit; }
