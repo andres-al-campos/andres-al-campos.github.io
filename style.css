@@ -227,8 +227,9 @@ body {
 .row:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
 
 /* Mark, then a text column holding the name and tagline stacked; the blurb and
-   tags run full-width beneath. Aligned to the top so the mark sits level with
-   the name rather than floating against the middle of two text lines. */
+   tags run full-width beneath. The mark box is sized to the full two-line
+   header, so it reads level with the name+tagline pair rather than only the
+   name. */
 .rhead {
   display: flex;
   align-items: flex-start;
@@ -239,12 +240,12 @@ body {
 .rhtext { min-width: 0; }
 
 /* The mark carries the visual weight of the card — it stands in for the
-   screenshot the card layout used to lead with. */
+   screenshot the card layout used to lead with. Square, matched to the height
+   of the two text lines beside it. */
 .mark {
-  width: 38px;
-  height: 38px;
+  width: 47px;
+  height: 47px;
   flex: none;
-  margin-top: 1px;
 }
 
 .mark svg {
@@ -353,6 +354,6 @@ footer a:hover { color: var(--amber); border-bottom-color: currentColor; }
 @media (max-width: 620px) {
   .row { padding: 16px 16px 18px; }
   .rhead { gap: 12px; margin-bottom: 12px; }
-  .mark { width: 34px; height: 34px; }
+  .mark { width: 44px; height: 44px; }
   .row .arrow { display: none; }
 }
