@@ -243,8 +243,8 @@ body {
    screenshot the card layout used to lead with. Square, matched to the height
    of the two text lines beside it. */
 .mark {
-  width: 47px;
-  height: 47px;
+  width: 44px;
+  height: 44px;
   flex: none;
 }
 
@@ -354,6 +354,6 @@ footer a:hover { color: var(--amber); border-bottom-color: currentColor; }
 @media (max-width: 620px) {
   .row { padding: 16px 16px 18px; }
   .rhead { gap: 12px; margin-bottom: 12px; }
-  .mark { width: 44px; height: 44px; }
+  .mark { width: 42px; height: 42px; }
   .row .arrow { display: none; }
 }
