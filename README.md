@@ -5,8 +5,8 @@ no dependencies. Push to `main` and GitHub Pages serves it.
 
 ## Adding a project
 
-Append an object to the array in `projects.js`. Nothing else needs editing; the page
-builds the cards and the filter row from that array.
+Append an object to the array in `projects.js`. The page builds the cards and the filter
+row from that array.
 
 ```js
 {
@@ -16,24 +16,18 @@ builds the cards and the filter row from that array.
   tags: ["Swift", "SwiftUI"],
   platform: "macos",              // browser | macos | ios | tools
   repo: "https://github.com/andres-al-campos/Thing",
-  image: "img/thing.png",         // optional — omit for a text-only card
 }
 ```
 
 A new `platform` value needs a label in the `LABELS` map in `index.html` and an entry
 in the ordered list just below it. Everything else is automatic.
 
-## Screenshots
+## Marks
 
-Drop a PNG in `img/` and point `image:` at it. They're capped at 420px tall and
-centered, so any aspect ratio works — a wide dashboard and a tall extension popup
-both sit correctly. Downscale to ~1200px on the long edge first:
-
-```bash
-sips -Z 1200 img/thing.png
-```
-
-Prefer a shot of the app doing its actual job over an empty start screen.
+Each project card leads with a small hand-drawn mark instead of a screenshot. The marks
+live in `marks.js`, keyed by project name — one 32×32 viewBox, one stroke weight, two
+amber tones. A new project needs a matching entry there. `marks.js` is shared by the site
+and the local mockups, so edit it there, not in a copy.
 
 ## Local preview
 
@@ -41,5 +35,5 @@ Prefer a shot of the app doing its actual job over an empty start screen.
 python3 -m http.server 8000
 ```
 
-Then open <http://localhost:8000>. Check both color schemes and the 720px breakpoint
-where the grid drops to one column.
+Then open <http://localhost:8000>. Check both color schemes. The layout is a single
+column of full-width cards; below 620px the padding tightens and the hover arrow drops.
