@@ -86,7 +86,7 @@ const PROJECTS = [
   },
   {
     name: "Somnya",
-    tagline: "Measured, not scored.",
+    tagline: "Sleep measured, not scored.",
     blurb:
       "An on-device iPhone sleep tracker that senses movement, breathing, and heartbeat overnight and reports what it actually measured. Lying awake still looks identical to deep sleep on an accelerometer, so every stat carries a tier: sensor fact, honest estimate, or not enough data.",
     tags: ["Swift", "SwiftData", "signal processing"],

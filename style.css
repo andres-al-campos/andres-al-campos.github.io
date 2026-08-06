@@ -1,32 +1,38 @@
 :root {
-  --bg: #fbfaf8;
-  --surface: #ffffff;
-  --ink: #1a1a18;
-  --ink-soft: #55534e;
-  --ink-faint: #85827b;
-  --line: #e5e2db;
-  --accent: #3f5d9c;
-  --chip: #f1efe9;
-  --shadow: 0 1px 2px rgba(26, 26, 24, .04), 0 6px 20px rgba(26, 26, 24, .05);
-  --shadow-lift: 0 2px 4px rgba(26, 26, 24, .05), 0 14px 36px rgba(26, 26, 24, .09);
+  --bg: #F7F5F1;
+  --bg2: #FFFFFF;
+  --line: #E4E0D8;
+  --ink: #16171B;
+  --soft: #5C5A63;
+  --faint: #8E8B95;
+  --amber: #B4701A;
+  --glow: rgba(180, 112, 26, .10);
+  --chip: #F1EEE8;
+  --pill-bg: #FFFFFF;
+  --card: 0 1px 2px rgba(26, 26, 24, .04), 0 6px 20px rgba(26, 26, 24, .05);
+  --card-lift: 0 2px 4px rgba(26, 26, 24, .06), 0 16px 38px rgba(26, 26, 24, .10);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #14151a;
-    --surface: #1b1d23;
-    --ink: #eceae5;
-    --ink-soft: #a8a59e;
-    --ink-faint: #78756f;
-    --line: #2b2e36;
-    --accent: #8fabe4;
-    --chip: #23262e;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .28);
-    --shadow-lift: 0 2px 4px rgba(0, 0, 0, .34), 0 14px 36px rgba(0, 0, 0, .42);
+    --bg: #0B0D12;
+    --bg2: #12151C;
+    --line: #1E222C;
+    --ink: #E8E6E1;
+    --soft: #8A8894;
+    --faint: #5D5B67;
+    --amber: #E8A24C;
+    --glow: rgba(232, 162, 76, .16);
+    --chip: #181B23;
+    --pill-bg: #151821;
+    --card: 0 1px 2px rgba(0, 0, 0, .16), 0 6px 20px rgba(0, 0, 0, .10);
+    --card-lift: 0 2px 4px rgba(0, 0, 0, .2), 0 16px 38px rgba(0, 0, 0, .22);
   }
 }
 
 * { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
 
 body {
   margin: 0;
@@ -35,169 +41,268 @@ body {
   font: 400 17px/1.6 ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   padding: 0 clamp(20px, 5vw, 40px);
+  overflow-x: hidden;
 }
 
+/* Ambient bloom — the light the marks sit in. Fixed, behind everything. */
+.bloom { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.bloom i { position: absolute; display: block; border-radius: 50%; filter: blur(90px); opacity: .9; }
+.bloom i:nth-child(1) { width: 52vw; height: 52vw; left: -14vw; top: -20vw; background: var(--glow); }
+.bloom i:nth-child(2) { width: 34vw; height: 34vw; right: -8vw; top: 22vh; background: var(--glow); opacity: .55; }
+.bloom i:nth-child(3) { width: 40vw; height: 40vw; left: 30vw; bottom: -20vw; background: var(--glow); opacity: .4; }
+
 .masthead, main, footer {
-  max-width: 1040px;
+  max-width: 880px;
   margin: 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 /* ---- masthead ---- */
 
-.masthead { padding: clamp(64px, 11vw, 128px) 0 clamp(32px, 5vw, 56px); }
+.masthead { padding: clamp(80px, 16vw, 170px) 0 clamp(40px, 6vw, 66px); }
 
-.masthead h1 {
-  margin: 0 0 20px;
-  font-size: clamp(34px, 5.4vw, 52px);
-  line-height: 1.1;
-  letter-spacing: -.022em;
+.who {
+  margin: 0 0 14px;
+  font-size: 14px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+  color: var(--faint);
   font-weight: 600;
 }
+
+.masthead h1 {
+  margin: 0 0 22px;
+  font-size: clamp(30px, 4.6vw, 46px);
+  line-height: 1.12;
+  letter-spacing: -.032em;
+  font-weight: 600;
+  max-width: 19ch;
+  text-wrap: balance;
+}
+
+.masthead h1 .lit { color: var(--amber); text-shadow: 0 0 34px var(--glow); }
 
 .intro {
   max-width: 60ch;
   margin: 0;
-  font-size: clamp(17px, 2vw, 19px);
-  color: var(--ink-soft);
+  font-size: clamp(15.5px, 1.8vw, 17.5px);
+  color: var(--soft);
 }
 
 .links {
-  margin: 28px 0 0;
+  margin: 30px 0 0;
   display: flex;
-  gap: 22px;
-  font-size: 15px;
+  gap: 26px;
+  font-size: 14.5px;
+  flex-wrap: wrap;
 }
 
 .links a {
-  color: var(--accent);
+  color: var(--amber);
   text-decoration: none;
-  border-bottom: 1px solid transparent;
-  padding-bottom: 1px;
+  position: relative;
+  padding-bottom: 2px;
 }
 
-.links a:hover { border-bottom-color: currentColor; }
+/* Underline grows from the left rather than fading in — the link reads as a
+   control being engaged, not as something merely highlighted. */
+.links a::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 1px;
+  background: currentColor;
+  opacity: .35;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform .28s cubic-bezier(.2, .7, .3, 1), opacity .28s;
+}
 
-/* ---- filters ---- */
+.links a:hover::after { transform: scaleX(1); opacity: .9; }
+.links a:focus-visible { outline: 2px solid var(--amber); outline-offset: 4px; border-radius: 3px; }
+
+/* ---- filter pill ---- */
 
 .filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 0 32px;
-}
-
-.filters button {
-  font: inherit;
-  font-size: 14px;
-  line-height: 1;
-  color: var(--ink-soft);
-  background: transparent;
+  position: sticky;
+  top: 16px;
+  z-index: 5;
+  display: inline-flex;
+  gap: 2px;
+  padding: 7px;
+  margin: 0 0 clamp(28px, 4vw, 44px);
+  background: var(--pill-bg);
   border: 1px solid var(--line);
   border-radius: 999px;
-  padding: 9px 16px;
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .28), 0 10px 34px rgba(0, 0, 0, .18);
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filters::-webkit-scrollbar { display: none; }
+
+.filters button {
+  position: relative;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 8px 17px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--soft);
   cursor: pointer;
-  transition: color .15s, border-color .15s, background .15s;
+  white-space: nowrap;
+  transition: color .2s;
+  z-index: 1;
 }
 
-.filters button:hover { color: var(--ink); border-color: var(--ink-faint); }
+.filters button:hover { color: var(--ink); }
+.filters button[aria-current="true"] { color: var(--bg); }
+.filters button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
-.filters button[aria-current="true"] {
-  color: var(--bg);
-  background: var(--ink);
-  border-color: var(--ink);
+/* The lit pill slides between buttons instead of each button toggling its own
+   background, so the selection reads as one object moving. */
+.pill {
+  position: absolute;
+  top: 7px;
+  height: calc(100% - 14px);
+  border-radius: 999px;
+  background: var(--amber);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--amber) 55%, transparent),
+              0 0 30px color-mix(in srgb, var(--amber) 30%, transparent);
+  transition: transform .38s cubic-bezier(.32, .72, .26, 1), width .38s cubic-bezier(.32, .72, .26, 1);
+  z-index: 0;
+  pointer-events: none;
 }
 
-.filters button:focus-visible,
-.card:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+/* ---- groups ---- */
+
+.group { margin: 0 0 clamp(34px, 5vw, 54px); scroll-margin-top: 80px; }
+
+.group .rows { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+
+.glabel {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--faint);
+  font-weight: 600;
+  margin: 0 0 4px;
 }
 
-/* ---- grid ---- */
+.glabel::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 
-/* Masonry via CSS columns rather than grid. Cards vary a lot in height — a
-   card with a screenshot is roughly twice a text-only one — and in a grid
-   every row would start level with the tallest card above it, leaving big
-   gaps. Columns let each card sit directly under the previous one. */
-.grid {
-  column-count: 2;
-  column-gap: clamp(18px, 2.4vw, 28px);
-}
+/* ---- rows ---- */
 
-@media (max-width: 720px) {
-  .grid { column-count: 1; }
-}
-
-/* break-inside stops a card from being split across the column boundary.
-   Block rather than flex — a flex container is unreliable to keep intact
-   across a column break in some engines. */
-.card {
+/* Each project is a card, not a text row — the border is the affordance that
+   says "clickable" before anyone reads a word, and it's the only one that
+   survives on touch, where there is no hover. */
+.row {
   display: block;
-  break-inside: avoid;
-  margin-bottom: clamp(18px, 2.4vw, 28px);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  overflow: hidden;
   text-decoration: none;
   color: inherit;
-  box-shadow: var(--shadow);
-  transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+  position: relative;
+  padding: 20px 22px 22px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--card);
+  transition: transform .2s, border-color .2s, box-shadow .2s;
 }
 
-.card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow-lift);
-  border-color: var(--ink-faint);
+.row:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--amber) 38%, var(--line));
+  box-shadow: var(--card-lift);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .card { transition: none; }
-  .card:hover { transform: none; }
-}
+.row:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
 
-/* Screenshots vary a lot in shape — a wide dashboard, a tall extension popup.
-   A fixed frame would either crop the tall ones or float them in dead space,
-   so the image sets its own height and just caps how tall it can get. */
-.shot {
-  background: var(--chip);
-  border-bottom: 1px solid var(--line);
+/* Mark, then a text column holding the name and tagline stacked; the blurb and
+   tags run full-width beneath. Aligned to the top so the mark sits level with
+   the name rather than floating against the middle of two text lines. */
+.rhead {
   display: flex;
-  justify-content: center;
-  overflow: hidden;
+  align-items: flex-start;
+  gap: 14px;
+  margin: 0 0 14px;
 }
 
-.shot img {
-  max-width: 100%;
-  max-height: 420px;
+.rhtext { min-width: 0; }
+
+/* The mark carries the visual weight of the card — it stands in for the
+   screenshot the card layout used to lead with. */
+.mark {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  margin-top: 1px;
+}
+
+.mark svg {
+  width: 100%;
+  height: 100%;
   display: block;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  overflow: visible;
 }
 
-.body {
-  padding: 24px 24px 22px;
-}
+.mark svg .s { stroke: var(--amber); stroke-width: 1.7; fill: none; }
+.mark svg .f { fill: var(--amber); stroke: none; }
+.mark svg .dim { opacity: .32; }
+.mark svg .lit { filter: drop-shadow(0 0 5px var(--glow)); }
 
-/* Text-only cards carry the weight themselves, so give them more room. */
-.no-shot .body { padding-top: 30px; }
-
-.card h2 {
-  margin: 0;
-  font-size: 21px;
-  letter-spacing: -.012em;
-  font-weight: 600;
-}
-
-.tagline {
-  margin: 5px 0 0;
+.row h2 {
+  margin: 0 0 2px;
   font-size: 15px;
-  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: var(--faint);
+  transition: color .25s;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.row:hover h2 { color: var(--amber); }
+
+.row .arrow {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--faint);
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity .25s, transform .25s, color .25s;
+}
+
+.row:hover .arrow { opacity: 1; transform: translateX(0); color: var(--amber); }
+
+/* The line people actually read — sits under the mono name label as the second
+   row of the header, same size but carried in ink rather than the faint label. */
+.tagline {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+  letter-spacing: -.005em;
+  font-weight: 500;
+  color: var(--ink);
+  text-wrap: balance;
 }
 
 .blurb {
-  margin: 14px 0 0;
-  font-size: 15.5px;
-  line-height: 1.62;
-  color: var(--ink-soft);
+  margin: 9px 0 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--soft);
+  max-width: 62ch;
 }
 
 .tags {
@@ -205,39 +310,49 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 20px 0 0;
+  margin: 14px 0 0;
   padding: 0;
 }
 
 .tags li {
-  font-size: 12.5px;
-  line-height: 1;
-  color: var(--ink-faint);
-  background: var(--chip);
+  font-size: 11px;
+  letter-spacing: .03em;
+  color: var(--faint);
+  border: 1px solid var(--line);
   border-radius: 5px;
-  padding: 6px 9px;
+  padding: 3px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  transition: border-color .25s, color .25s;
 }
 
-.repo {
-  display: block;
-  padding-top: 20px;
-  font-size: 14px;
-  color: var(--accent);
+.row:hover .tags li {
+  border-color: color-mix(in srgb, var(--amber) 26%, var(--line));
+  color: var(--soft);
 }
 
-.card:hover .repo { text-decoration: underline; }
-
-.empty {
-  color: var(--ink-faint);
-  padding: 40px 0;
-}
+.empty { color: var(--faint); padding: 40px 0; }
 
 /* ---- footer ---- */
 
 footer {
-  padding: clamp(56px, 9vw, 96px) 0 48px;
-  font-size: 14px;
-  color: var(--ink-faint);
+  padding: clamp(56px, 9vw, 110px) 0 56px;
+  font-size: 13.5px;
+  color: var(--faint);
+  border-top: 1px solid var(--line);
+  margin-top: clamp(30px, 5vw, 50px);
 }
 
-footer a { color: inherit; }
+footer a { color: var(--soft); text-decoration: none; border-bottom: 1px solid var(--line); }
+footer a:hover { color: var(--amber); border-bottom-color: currentColor; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+  html { scroll-behavior: auto; }
+}
+
+@media (max-width: 620px) {
+  .row { padding: 16px 16px 18px; }
+  .rhead { gap: 12px; margin-bottom: 12px; }
+  .mark { width: 34px; height: 34px; }
+  .row .arrow { display: none; }
+}

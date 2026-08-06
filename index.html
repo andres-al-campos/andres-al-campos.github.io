@@ -3,19 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Alex Campos — projects</title>
-<meta name="description" content="Browser extensions, menu bar apps, and small tools for measuring and reclaiming your own time and attention.">
+<title>Alex Campos — tools that take the friction out</title>
+<meta name="description" content="Browser extensions, menu bar apps, iPhone apps, and analysis pipelines. Each one started as something that annoyed me often enough to be worth a weekend, or a year.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+<div class="bloom" aria-hidden="true"><i></i><i></i><i></i></div>
+
 <header class="masthead">
-  <h1>Alex Campos</h1>
+  <p class="who">Alex Campos</p>
+  <h1>Tools that take the <span class="lit">friction out</span>.</h1>
   <p class="intro">
-    I build tools that measure things I couldn't otherwise see, and then give me
-    control over them: where my time actually goes, whether a rating is honest,
-    what I said six months ago. Browser extensions, menu bar apps, iPhone apps,
-    and analysis pipelines. It all runs on my own machine.
+    Browser extensions, menu bar apps, iPhone apps, and analysis pipelines. Each one
+    started as something that annoyed me often enough to be worth a weekend, or a year.
+    They all run on my own machine.
   </p>
   <p class="links">
     <a href="https://github.com/andres-al-campos">GitHub</a>
@@ -24,8 +26,8 @@
 </header>
 
 <main>
-  <nav class="filters" id="filters" aria-label="Filter projects by platform"></nav>
-  <div class="grid" id="grid"></div>
+  <nav class="filters" id="filters" aria-label="Filter projects by platform"><span class="pill" id="pill"></span></nav>
+  <div id="groups"></div>
   <p class="empty" id="empty" hidden>Nothing here yet.</p>
 </main>
 
@@ -33,19 +35,22 @@
   <p>Built as a static page. <a href="https://github.com/andres-al-campos/andres-al-campos.github.io">Source</a>.</p>
 </footer>
 
+<script src="marks.js"></script>
 <script src="projects.js"></script>
 <script>
 (function () {
-  var grid = document.getElementById('grid');
+  var groupsEl = document.getElementById('groups');
   var filters = document.getElementById('filters');
+  var pill = document.getElementById('pill');
   var empty = document.getElementById('empty');
 
+  var ORDER = ['browser', 'tools', 'macos', 'ios'];
   var LABELS = {
     all: 'All',
     browser: 'Browser',
+    tools: 'Tools',
     macos: 'macOS',
-    ios: 'iPhone',
-    tools: 'Tools'
+    ios: 'iPhone'
   };
 
   function el(tag, cls, text) {
@@ -55,67 +60,97 @@
     return n;
   }
 
-  function card(p) {
-    var a = el('a', 'card');
+  function row(p) {
+    var a = el('a', 'row');
     a.href = p.repo;
     a.rel = 'noopener';
 
-    if (p.image) {
-      var shot = el('div', 'shot');
-      var img = el('img');
-      img.src = p.image;
-      img.alt = p.name + ' screenshot';
-      img.loading = 'lazy';
-      shot.appendChild(img);
-      a.appendChild(shot);
-    } else {
-      a.classList.add('no-shot');
-    }
+    var head = el('div', 'rhead');
+    var mark = el('div', 'mark');
+    // Marks are authored SVG in marks.js, not user input.
+    mark.innerHTML = '<svg viewBox="0 0 32 32" aria-hidden="true">' + MARKS[p.name].svg + '</svg>';
+    head.appendChild(mark);
 
-    var body = el('div', 'body');
-    body.appendChild(el('h2', null, p.name));
-    body.appendChild(el('p', 'tagline', p.tagline));
-    body.appendChild(el('p', 'blurb', p.blurb));
+    var htext = el('div', 'rhtext');
+    htext.appendChild(el('h2', null, p.name));
+    htext.appendChild(el('p', 'tagline', p.tagline));
+    head.appendChild(htext);
+
+    head.appendChild(el('span', 'arrow', '↗'));
+    a.appendChild(head);
+
+    a.appendChild(el('p', 'blurb', p.blurb));
 
     var tags = el('ul', 'tags');
     p.tags.forEach(function (t) { tags.appendChild(el('li', null, t)); });
-    body.appendChild(tags);
+    a.appendChild(tags);
 
-    body.appendChild(el('span', 'repo', 'View on GitHub'));
-    a.appendChild(body);
     return a;
   }
 
   function render(platform) {
-    grid.textContent = '';
-    var shown = PROJECTS.filter(function (p) {
-      return platform === 'all' || p.platform === platform;
+    groupsEl.textContent = '';
+    var keys = platform === 'all' ? ORDER : [platform];
+    var shown = 0;
+
+    keys.forEach(function (k) {
+      var items = PROJECTS.filter(function (p) { return p.platform === k; });
+      if (!items.length) return;
+      shown += items.length;
+
+      var g = el('section', 'group');
+      g.appendChild(el('div', 'glabel', LABELS[k]));
+      var list = el('div', 'rows');
+      items.forEach(function (p) { list.appendChild(row(p)); });
+      g.appendChild(list);
+      groupsEl.appendChild(g);
     });
-    shown.forEach(function (p) { grid.appendChild(card(p)); });
-    empty.hidden = shown.length > 0;
+
+    empty.hidden = shown > 0;
+  }
+
+  function movePill(btn) {
+    // offsetLeft is from the container's border box, but the absolutely-positioned
+    // pill sits against the padding box — subtract the padding so they line up.
+    pill.style.width = btn.offsetWidth + 'px';
+    pill.style.transform = 'translateX(' + (btn.offsetLeft - 7) + 'px)';
   }
 
   // Build the filter row from the platforms actually present, in a fixed order.
-  var present = ['browser', 'macos', 'ios', 'tools'].filter(function (k) {
+  var present = ORDER.filter(function (k) {
     return PROJECTS.some(function (p) { return p.platform === k; });
   });
 
+  var buttons = [];
   ['all'].concat(present).forEach(function (key, i) {
     var b = el('button', null, LABELS[key]);
     b.type = 'button';
     b.dataset.platform = key;
     if (i === 0) b.setAttribute('aria-current', 'true');
     b.addEventListener('click', function () {
-      filters.querySelectorAll('button').forEach(function (o) {
-        o.removeAttribute('aria-current');
-      });
+      buttons.forEach(function (o) { o.removeAttribute('aria-current'); });
       b.setAttribute('aria-current', 'true');
+      movePill(b);
       render(key);
     });
     filters.appendChild(b);
+    buttons.push(b);
   });
 
   render('all');
+  // Wait a frame so the buttons have laid out and offsetWidth is real. The first
+  // placement is not a selection change, so suppress the slide transition for it —
+  // otherwise the pill visibly travels in from the left on page load.
+  requestAnimationFrame(function () {
+    pill.style.transition = 'none';
+    movePill(buttons[0]);
+    requestAnimationFrame(function () { pill.style.transition = ''; });
+  });
+
+  window.addEventListener('resize', function () {
+    var cur = filters.querySelector('[aria-current="true"]');
+    if (cur) movePill(cur);
+  });
 })();
 </script>
 
