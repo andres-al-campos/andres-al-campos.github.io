@@ -246,6 +246,13 @@ const DEF={
   // blends: 0 = all height (as before), 1 = all slope. 0.55 lit almost the whole
   // surface and washed out the troughs, so the default sits lower.
   slopeLit:.3,
+  litRange:.55,       // lit value that maps to full brightness. Lower = the
+                      // shading reaches white sooner, so more of the water is
+                      // in the bright half of the scale.
+  litGamma:.75,       // curve on the shading. <1 lifts the mid-tones, which is
+                      // where nearly all the surface sits.
+  floor:.14,          // darkest a segment gets, as a fraction of full. Replaces
+                      // the old hardcoded 0.65, which wasted 19 bands.
   // Foam: bright specks on the steepest crests only. The trigger is slope
   // normalised by the line's own amp*k, which is scale-free -- a fixed slope
   // threshold caught 8% of far lines and 60% of near ones, since slope scales
@@ -315,6 +322,9 @@ const SPEC=[
   ['width','line width',.2,3.5,.05,2],
   ['crest','crest contrast',0,2,.05,2],
   ['slopeLit','light on slopes',0,1,.02,2],
+  ['litRange','light range',.1,2,.05,2],
+  ['litGamma','light curve',.2,2,.05,2],
+  ['floor','shadow floor',0,.6,.01,2],
   ['foam','foam',0,2,.02,2],
   ['foamAt','foam threshold',1,3,.02,2],
  ]],
@@ -879,8 +889,19 @@ function frame(now){
       const slope=Math.min(2.5,Math.abs(b2[1]-a2[1])/step*14);
       // scale-free: divides out this line's own amplitude and wavenumber
       const nslope=Math.abs(b2[1]-a2[1])/step/(amp*kxi+1e-6);
+      // Normalise the lighting into 0..1 before it becomes brightness.
+      // The old form was base*(0.65 + lit*crest), and the constant 0.65 was a
+      // floor so troughs never vanished -- but as a CONSTANT it ate 19 of the 64
+      // brightness bands before any shading happened, and lit itself only spans
+      // about 0..0.9. Measured, that left 17 bands in use, 10 of them carrying
+      // everything, all clumped between band 18 and 27: a quarter of the range,
+      // which is why the water read as "bright lines and dim lines" with nothing
+      // in between. Mapping lit through its own range and applying a gamma uses
+      // the whole scale, and `floor` stays available as a real minimum.
       const lit=crest*(1-P.slopeLit) + slope*P.slopeLit;
-      let al=base*(0.65+lit*P.crest);
+      const litN=Math.min(1,Math.max(0,lit/Math.max(.01,P.litRange)));
+      const shade=Math.pow(litN,Math.max(.05,P.litGamma));
+      let al=base*(P.floor+(1-P.floor)*shade)*(1+P.crest);
       if(al<0.004)continue;
       // Dither. More bands shrink the steps but leave the boundaries in fixed
       // places, so what is left of the terracing still runs as continuous
@@ -894,7 +915,9 @@ function frame(now){
       // and shows up as speckle, and because the jitter is one-sided in
       // aggregate it also lifts the mean brightness. 0.35 of a band clears the
       // contours without the noise reading as grain.
-      const fb=al/(base*2.2)*BANDS + (dith[j&63]-0.5)*P.dithAmt;
+      // Band straight off the normalised shade: the whole 0..BANDS range is
+      // reachable now, instead of the 25% the old al/(base*2.2) mapping allowed.
+      const fb=(P.floor+(1-P.floor)*shade)*BANDS + (dith[j&63]-0.5)*P.dithAmt;
       bands[Math.max(0,Math.min(BANDS-1,fb|0))].push(a2,b2);
       if(P.foam>0 && nslope>P.foamAt) foam.push(a2,b2);
     }
