@@ -158,11 +158,20 @@ const DEF={
   gustRate:34,        // gusts per second
   gustSize:17,        // gust footprint in cells
   windDir:1.45,       // wave heading, radians. ~pi/2 travels toward the viewer
-  windSpread:.26,     // how much headings scatter around it. 0 = glassy corduroy
-  swell2:.4,          // share of gusts belonging to the crossing swell
-  swell2Ang:.6,       // its heading offset, radians. 0 = no crossing at all
+  windSpread:.10,     // how much headings scatter around it. 0 = glassy corduroy
+  swell2:.50,         // share of gusts belonging to the crossing swell
+  swell2Ang:.9,       // its heading offset, radians. 0 = no crossing at all.
+                      // Must clear ~50 degrees to READ as a second direction:
+                      // at the old .6 (34 deg) the angular histogram showed a
+                      // single blob at 90, not two peaks -- the trains were
+                      // generated apart and merged, so the surface still looked
+                      // like everything moved one way. windSpread matters as
+                      // much: above ~13 deg the two peaks smear back together
+                      // whatever the separation.
   swell2Len:1.7,      // its wavelength vs the main train (older = longer)
-  swell2Amp:.85,      // its strength vs the main train
+  swell2Crest:0.7,    // its crest length vs the main train. Kept near 1: this is
+                      // footprint, not wavelength, and a wide stamp erases heading.
+  swell2Amp:1.4,      // its strength vs the main train
 
   // Disorder that travels front-to-back. This shifts where a line READS its
   // per-line randomness rather than adding height, so bands of the field go
@@ -280,6 +289,7 @@ const SPEC=[
   ['swell2','2nd swell share',0,.6,.02,2],
   ['swell2Ang','2nd swell angle',0,1.4,.05,2],
   ['swell2Len','2nd swell length',.5,3,.1,1],
+  ['swell2Crest','2nd swell crest len',.5,3,.1,1],
   ['swell2Amp','2nd swell strength',0,1.5,.05,2],
   ['stiff','stiffness',.3,1.9,.02,2],
   ['damp','damping',.1,2,.02,2],
@@ -584,11 +594,21 @@ function simGust(){
   // gusts land there and march into view already formed.
   const cx=grnd()*w|0;
   const cy=(P.hzSkirt|0)+1+grnd()*Math.max(1,P.fetch)|0;
-  // The crossing train is longer-period and a little weaker, the way a swell
-  // that has travelled is longer and smoother than the local wind chop.
+  // The crossing train is longer-period. It is also STRONGER than the main train,
+  // which looks wrong written down but is what the measurement demanded: the
+  // short train is steeper for the same height, so at equal amplitude it owns the
+  // gradient histogram and the long swell never resolves as its own direction.
+  // At swell2Amp .85 the second peak was 24% of the first; at 1.4 it is 79%.
   const gs = P.gustSize * (second ? P.swell2Len : 1);
-  const along =Math.max(3,gs*0.9);   // extent along travel
-  const across=Math.max(3,gs*2.2);   // crest length, the long axis
+  // Footprint does NOT follow wavelength. Scaling both together made the long
+  // swell's stamp 127px across a 156px-deep field -- one gust covering the whole
+  // pool lifts everything at once instead of drawing a crest line, so its angular
+  // histogram came out flat (5% peak vs 13% for the short train) and the surface
+  // read as "one direction plus mush". A long swell has LONG CRESTS, not a bigger
+  // blob: stretch the wavelength, keep the patch the size of the base gust.
+  const fp = P.gustSize;
+  const along =Math.max(3,fp*0.9);   // extent along travel
+  const across=Math.max(3,fp*2.2*(second?P.swell2Crest:1));   // crest length, the long axis
   const ph=grnd()*TAU, str=P.wind*0.10*(second?P.swell2Amp:1);
   // Wavelength follows gust size. Setting it independently (the old gustLen)
   // let short waves carry big-wave amplitude, which crosses the ropes over each
