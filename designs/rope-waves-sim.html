@@ -240,6 +240,13 @@ const DEF={
   beamWidth:.30,      // angular half-width of the cone, in radians.
   beamSoft:.55,       // fraction of the cone that is soft edge.
   beamLift:1.6,       // specular gain on crests facing the lamp.
+  lampX:.42,          // lamp position across the screen, 0..1.
+  beamWarm:1.0,       // how far lit water shifts toward amber. 0 = stays cool.
+  beamHaze:.35,       // glow bloom around the lamp itself. In CLEAR air a beam
+                      // is invisible from the side -- you only see where it
+                      // LANDS -- so there is deliberately no cone drawn in the
+                      // sky. Only the lamp gets a halo, which is the one part
+                      // real photographs show without fog.
   bands:64,           // brightness levels. This is a BATCHING budget, not a look:
                       // each band is one beginPath/stroke for every segment in
                       // it, so the count trades draw calls against tonal
@@ -343,6 +350,9 @@ const SPEC=[
   ['beamWidth','beam width',.05,1.2,.01,2],
   ['beamSoft','beam softness',0,1,.02,2],
   ['beamLift','crest glint',0,4,.05,2],
+  ['lampX','lamp position',0,1,.01,2],
+  ['beamWarm','beam warmth',0,1,.02,2],
+  ['beamHaze','lamp haze',0,1,.02,2],
   ['crest','crest contrast',0,2,.05,2],
   ['slopeLit','light on slopes',0,1,.02,2],
   ['slopeSmooth','slope smoothing',0,8,1,0],
@@ -415,7 +425,11 @@ addEventListener('keydown',e=>{
 });
 
 // ---- draw -----------------------------------------------------------------
-const COOL=[143,182,217], TAU=Math.PI*2;
+const COOL=[143,182,217], AMBER=[240,169,76], TAU=Math.PI*2;
+// Warm-tint buckets: a segment's colour is COOL->AMBER by how much beam it
+// caught. Banding by alpha alone would force one colour per band, so the beam
+// gets its own axis and each band is drawn once per tint bucket it uses.
+const TINTS=5;
 
 // Per-line randomness, drawn ONCE per (seed, line count) and cached. Rolling new
 // numbers every frame would make the lines flicker; what makes neighbours differ
@@ -774,11 +788,29 @@ function frame(now){
   beamStep(t);
 
   const hz=H*P.horizon, N=P.lines|0;
+  // Where the lamp sits on screen: a fixed point on the horizon, off to one
+  // side. The beam sweeps from here, so the glare path converges on it.
+  const lampX=W*P.lampX, lampY=hz-2;
 
   g.fillStyle='#070A10';g.fillRect(0,0,W,H);
   const sky=g.createLinearGradient(0,0,0,hz);
   sky.addColorStop(0,'#080C14');sky.addColorStop(1,'#0E1620');
   g.fillStyle=sky;g.fillRect(0,0,W,hz);
+  if(P.beam>0 && P.beamHaze>0){
+    // Only a halo at the source -- no shaft. In clear air the beam is invisible
+    // from the side and shows only where it lands; the solid cone-in-the-sky is
+    // a fog effect, and drawing it is what makes stylised lighthouses read as
+    // cartoons. Brightens while sweeping, never fully dark.
+    const pulse=0.30+0.70*(BEAM.on?1:0);
+    const rr=Math.max(8,W*0.075*P.beamHaze);
+    const gl=g.createRadialGradient(lampX,lampY,0,lampX,lampY,rr);
+    gl.addColorStop(0,'rgba(240,169,76,'+(0.34*pulse*P.beamHaze).toFixed(3)+')');
+    gl.addColorStop(.45,'rgba(240,169,76,'+(0.10*pulse*P.beamHaze).toFixed(3)+')');
+    gl.addColorStop(1,'rgba(240,169,76,0)');
+    g.fillStyle=gl;g.fillRect(lampX-rr,lampY-rr,rr*2,rr*2);
+    g.fillStyle='rgba(255,214,150,'+(0.55*pulse).toFixed(3)+')';
+    g.beginPath();g.arc(lampX,lampY,Math.max(1,W*0.0022),0,TAU);g.fill();
+  }
   const sea=g.createLinearGradient(0,hz,0,H);
   sea.addColorStop(0,'#0A121C');sea.addColorStop(1,'#070A10');
   g.fillStyle=sea;g.fillRect(0,hz,W,H-hz);
@@ -940,7 +972,7 @@ function frame(now){
     // the eye picks up on a smooth gradient, for 5x the path ops on a frame
     // that was running at twice its target.
     const BANDS=P.bands|0, bands=[];
-    for(let b=0;b<BANDS;b++)bands.push([]);
+    for(let b=0;b<BANDS*TINTS;b++)bands.push([]);
     // Slope is a finite difference between ADJACENT samples, so it is inherently
     // high-frequency: every bit of grid noise lands in it at full strength. Measured
     // along real lines, lighting from slope alone reverses direction sample-to-sample
@@ -982,11 +1014,12 @@ function frame(now){
       // so near segments need a big x offset to leave the cone and far ones a
       // small one -- that divergence is what makes the lit patch read as a cone
       // lying ON the water rather than a stripe painted over it.
+      let hit=0;
       if(BEAM.on){
         // Depth from `near` (1 = foreground): the draw pass is a separate loop
         // from the build pass, so the build pass's yDepth is out of scope here.
         const bd=1-near;
-        const bearing=Math.atan2((a2[0]-W*0.5)/W, 0.12+bd*1.6);
+        const bearing=Math.atan2((a2[0]-W*P.lampX)/W, 0.12+bd*1.6);
         const d=Math.abs(bearing-BEAM.a);
         const hw=Math.max(.01,P.beamWidth);
         // Soft-edged wedge: full inside, falling to 0 across the outer `soft`.
@@ -995,6 +1028,7 @@ function frame(now){
                  : d>=hw ? 0
                  : 1-(d-inner)/Math.max(1e-4,hw-inner);
         if(cone>0){
+          hit=cone*cone;
           // Specular: faces tilted toward the lamp bounce it at the viewer.
           // slope is |dy/dx| smoothed, so it stands in for how far this facet is
           // tilted out of horizontal -- crests glint, flat troughs stay dark.
@@ -1028,19 +1062,28 @@ function frame(now){
       // Band straight off the normalised shade: the whole 0..BANDS range is
       // reachable now, instead of the 25% the old al/(base*2.2) mapping allowed.
       const fb=(P.floor+(1-P.floor)*shade)*BANDS + (dith[j&63]-0.5)*P.dithAmt;
-      bands[Math.max(0,Math.min(BANDS-1,fb|0))].push(a2,b2);
+      const bi=Math.max(0,Math.min(BANDS-1,fb|0));
+      const ti=Math.min(TINTS-1,(hit*P.beamWarm*TINTS)|0);
+      bands[bi*TINTS+ti].push(a2,b2);
       if(P.foam>0 && nslope>P.foamAt) foam.push(a2,b2);
     }
 
     const lw=(0.5+near*1.5)*P.width;
-    const col=COOL.join(',');
     for(let b=0;b<BANDS;b++){
-      const seg=bands[b];if(!seg.length)continue;
       const al=base*2.2*(b+0.5)/BANDS;
-      g.beginPath();
-      for(let k2=0;k2<seg.length;k2+=2){g.moveTo(seg[k2][0],seg[k2][1]);g.lineTo(seg[k2+1][0],seg[k2+1][1]);}
-      g.strokeStyle='rgba('+col+','+(al*0.20)+')';g.lineWidth=lw*P.glow;g.stroke();
-      g.strokeStyle='rgba('+col+','+Math.min(1,al)+')';g.lineWidth=lw;g.stroke();
+      for(let ti=0;ti<TINTS;ti++){
+        const seg=bands[b*TINTS+ti];if(!seg.length)continue;
+        // Empty tint buckets cost nothing, so while the beam is off this is the
+        // same number of strokes as before: every segment lands in bucket 0.
+        const m=TINTS>1?ti/(TINTS-1):0;
+        const col=(COOL[0]+(AMBER[0]-COOL[0])*m|0)+','
+                 +(COOL[1]+(AMBER[1]-COOL[1])*m|0)+','
+                 +(COOL[2]+(AMBER[2]-COOL[2])*m|0);
+        g.beginPath();
+        for(let k2=0;k2<seg.length;k2+=2){g.moveTo(seg[k2][0],seg[k2][1]);g.lineTo(seg[k2+1][0],seg[k2+1][1]);}
+        g.strokeStyle='rgba('+col+','+(al*0.20)+')';g.lineWidth=lw*P.glow;g.stroke();
+        g.strokeStyle='rgba('+col+','+Math.min(1,al)+')';g.lineWidth=lw;g.stroke();
+      }
     }
 
     // Foam sits on top, whiter and tighter than the water beneath it.
