@@ -71,10 +71,6 @@ button.act:hover{border-color:var(--amber);color:var(--amber)}
  <p class="note">The ropes no longer make the waves — they read them off the simulated surface. These control how that reading is drawn.</p>
  <div id="gRope"></div>
 
- <h3>Magnetism (between lines)</h3>
- <p class="note">Each point is pulled toward the lines in front of and behind it. Attraction alone collapses the field, so a short-range repulsion holds them apart at the rest gap.</p>
- <div id="gMag"></div>
-
  <h3>Water</h3>
  <p class="note">Wind drops gusts on the surface; everything else is the wave equation. Reflection, interference and swell groups are not settings here — they are what the water does on its own.</p>
  <div id="gCross"></div>
@@ -119,18 +115,6 @@ addEventListener('resize',fit);fit();
 const DEF={
   lines:120, horizon:.34, persp:1.75,
 
-  // magnetism: lines pull on the lines in front of and behind them. OFF now.
-  // Measured on the simulated surface it moved points 0.17px on average and
-  // fixed none of the line crossings it exists to prevent -- the rest gap is
-  // the full row spacing, so repulsion fires on nearly every pair in both
-  // directions and cancels, and attraction is a smoother along y applied to a
-  // field the simulation already made smooth along y. What it did still do was
-  // drag ropes across each other on a steep crest, which showed as a
-  // crosshatched patch. Turning it off removed that and gained ~15fps.
-  mag:.55,            // attraction toward the neighbouring lines
-  magRep:.40,         // short-range push-back that stops them collapsing
-  magRest:1.0,        // rest gap, as a multiple of the natural row spacing
-  magPass:0,          // relaxation passes. 0 = off; see the note below
 
   // the water simulation
   simW:340, simH:210,   // grid resolution (simH includes the fetch band)
@@ -221,7 +205,6 @@ const DEF={
   // neighbour coupling DOES. Ten sliders became four gust controls.
   smooth:.6,          // Taubin smoothing strength
   smoothPass:2,       // how many smoothing passes
-  // magnetism: lines pull on the lines in front of and behind them
   // groups: swell arrives in sets. This is an ENVELOPE, not a wave -- it
   // scales how hard each patch of water swings rather than adding height of
   // its own. It replaces what used to be a "tide" that also lifted lines
@@ -276,12 +259,6 @@ const SPEC=[
   ['waveLen','foam scale (x)',.08,2.0,.02,2],
   ['smooth','smoothing',0,1,.02,2],
   ['smoothPass','smooth passes',0,8,1,0],
- ]],
- ['gMag',[
-  ['mag','attraction',0,2,.02,2],
-  ['magRep','repulsion',0,2,.02,2],
-  ['magRest','rest gap',.2,3,.05,2],
-  ['magPass','passes',0,8,1,0],
  ]],
  ['gCross',[
   ['wind','wind strength',0,3,.05,2],
@@ -425,12 +402,9 @@ function lineRandom(N,seed,scale,oct){
   }
 
   const r={
-    ph:     coherent(N,scale,oct),
     len:    coherent(N,scale,oct),
     amp:    coherent(N,scale,oct),
-    tph:    coherent(N,scale,oct),
   };
-  for(let i=0;i<N;i++){r.ph[i]*=Math.PI; r.tph[i]*=Math.PI;}
   RND=r; rndKey=key; return r;
 }
 
@@ -730,10 +704,9 @@ function frame(now){
   const R=lineRandom(N,P.seed|0,P.randScale,P.randOct|0);
 
   // ---- pass 1: build every line -----------------------------------------
-  // Magnetism needs each line to see its neighbours, so all lines must exist
-  // before any is drawn. One shared x grid across every line, so that point j
-  // of line i sits directly in front of point j of line i+1 and "the nearest
-  // point on the neighbouring line" is simply the same index.
+  // Every line is built before any is drawn, so the draw pass can run far-to-near
+  // and let nearer ropes occlude the ones behind. One shared x grid across every
+  // line, so point j of line i sits directly in front of point j of line i+1.
   const step=3.0, M=Math.ceil((W+80)/step)+1;
   const PY_=new Float64Array(N*M);          // y of every point
   const baseY=new Float64Array(N), ampA=new Float64Array(N), nearA=new Float64Array(N);
@@ -763,8 +736,7 @@ function frame(now){
     const fi=i + (yDepth0*TAU/Math.max(.02,P.chopLen))*P.chopAmt*P.randScale*0.16
                + t*P.chopRate*P.chopAmt*P.randScale*0.12;
 
-    const rAmp=sampleN(R.amp,fi),  rPh=sampleN(R.ph,fi),   rLen=sampleN(R.len,fi),
-          rTph=sampleN(R.tph,fi);
+    const rAmp=sampleN(R.amp,fi), rLen=sampleN(R.len,fi);
 
     const amp=(H-hz)*P.amp*(0.06+near*P.ampNear)
               *(1+rAmp*P.ropeRand*0.45);
@@ -809,39 +781,6 @@ function frame(now){
       }
       let z=simAtBox(sx,gy,gyW)*P.simGain;
       PY_[row+j]=y0 - z*amp;
-    }
-  }
-
-  // ---- pass 2: magnetism, across lines ----------------------------------
-  // Each point is pulled toward the same-index points on the lines in front of
-  // and behind it — the same relaxation as Taubin, but running along y instead
-  // of along x. Attraction on its own has no equilibrium and would collapse the
-  // whole field onto one line, so a repulsion term pushes back once a pair is
-  // closer than the rest gap. The two together settle at that gap, which is
-  // what lets the lines bundle at crests without merging.
-  if(P.magPass>0 && (P.mag>0 || P.magRep>0)){
-    const buf=new Float64Array(N*M);
-    for(let q=0;q<P.magPass;q++){
-      buf.set(PY_);
-      for(let i=1;i<N-1;i++){
-        const row=i*M, up=row-M, dn=row+M;
-        // the natural spacing at this depth is the rest length the springs want
-        const rest=Math.max(.5,(baseY[i+1]-baseY[i-1])*0.5)*P.magRest;
-        for(let j=0;j<M;j++){
-          const y=buf[row+j], ya=buf[up+j], yb=buf[dn+j];
-          const da=y-ya, db=y-yb;
-          // attraction: move a fraction of the way toward the midpoint
-          let f=P.mag*0.25*((ya+yb)*0.5-y);
-          // repulsion: only when closer than rest, and softened by distance so
-          // it cannot fire a point across the field in one step
-          const aa=Math.abs(da), ab=Math.abs(db);
-          if(aa<rest) f+=P.magRep*0.5*(rest-aa)*(da<0?-1:1);
-          if(ab<rest) f+=P.magRep*0.5*(rest-ab)*(db<0?-1:1);
-          // clamp so one pass can never move a point more than a rest gap
-          if(f>rest)f=rest; else if(f<-rest)f=-rest;
-          PY_[row+j]=y+f;
-        }
-      }
     }
   }
 
