@@ -227,8 +227,17 @@ const DEF={
 
   // look
   bright:1.55, glow:4.2, width:1.0, crest:.62,
-  bands:32,           // brightness levels — low values posterize the lighting
-  dithAmt:.35,        // how far to jitter across a band edge, in bands
+  bands:64,           // brightness levels. This is a BATCHING budget, not a look:
+                      // each band is one beginPath/stroke for every segment in
+                      // it, so the count trades draw calls against tonal
+                      // smoothness. Measured: 32->118fps, 64->100, 96->75,
+                      // 200->59. 64 is where the terracing stops being visible
+                      // and the cost is still small.
+  dithAmt:0,          // Jitter across band edges. OFF: measured free (118 vs 116
+                      // fps), so it was never earning its keep, and what it
+                      // actually did was trade contour lines for speckle -- the
+                      // water read as grainy rather than wet. With enough bands
+                      // there is no edge left to hide, which is the better fix.
   dimFar:.55,         // horizon brightness as a fraction of the foreground's
   // Lighting mix. Height-based lighting glows AT the crest, which reads as a
   // glowing ridge; real water glows where the surface TILTS toward the light,
