@@ -227,6 +227,19 @@ const DEF={
 
   // look
   bright:1.0, glow:4.2, width:1.0, crest:1.4,
+  // --- Lighthouse ---------------------------------------------------------
+  beam:1.0,           // master intensity. 0 = off.
+  beamSweep:2.0,      // seconds for one crossing of the field.
+  beamGapMin:8,       // seconds of dark between sweeps, low end...
+  beamGapMax:20,      // ...and high end. Randomised per sweep: a FIXED gap is
+                      // still a metronome, just a sparser one, and behind body
+                      // copy a predictable beat pulls the eye off the text.
+  beamDouble:6,       // odds of a double sweep: 1-in-N. 0 = never. Random
+                      // rather than every-Nth for the same reason as the gap --
+                      // a deterministic count is a pattern at a longer period.
+  beamWidth:.30,      // angular half-width of the cone, in radians.
+  beamSoft:.55,       // fraction of the cone that is soft edge.
+  beamLift:1.6,       // specular gain on crests facing the lamp.
   bands:64,           // brightness levels. This is a BATCHING budget, not a look:
                       // each band is one beginPath/stroke for every segment in
                       // it, so the count trades draw calls against tonal
@@ -322,6 +335,14 @@ const SPEC=[
   ['dimFar','horizon brightness',.1,1,.02,2],
   ['glow','glow spread',1,10,.1,1],
   ['width','line width',.2,3.5,.05,2],
+  ['beam','lighthouse',0,2,.05,2],
+  ['beamSweep','sweep seconds',.4,6,.1,2],
+  ['beamGapMin','gap min',1,30,.5,1],
+  ['beamGapMax','gap max',1,60,.5,1],
+  ['beamDouble','double 1-in-N',0,12,1,0],
+  ['beamWidth','beam width',.05,1.2,.01,2],
+  ['beamSoft','beam softness',0,1,.02,2],
+  ['beamLift','crest glint',0,4,.05,2],
   ['crest','crest contrast',0,2,.05,2],
   ['slopeLit','light on slopes',0,1,.02,2],
   ['slopeSmooth','slope smoothing',0,8,1,0],
@@ -712,10 +733,45 @@ function simAtBox(fx,fy,fw){
   return a/n;
 }
 
+// --- Lighthouse ------------------------------------------------------------
+// A steady orbit reads as a metronome behind text, so the lamp does one fast
+// eased sweep and then goes dark for a randomised gap. BEAM.a is the current
+// beam bearing in radians (0 = pointing straight at the viewer, +/- = off to
+// the sides); BEAM.on is 0 while dark.
+const BEAM={next:4, until:0, dir:1, left:0, on:0, a:0};
+function beamStep(t){
+  if(P.beam<=0){BEAM.on=0;return;}
+  if(t>=BEAM.next && BEAM.left<=0){
+    // Schedule a fresh burst: one sweep, or occasionally two back to back.
+    const n=(P.beamDouble|0)>0 && Math.random()<1/(P.beamDouble|0) ? 2 : 1;
+    BEAM.left=n; BEAM.dir=Math.random()<.5?-1:1;
+    BEAM.until=t+P.beamSweep;
+  }
+  if(BEAM.left>0 && t<BEAM.until){
+    const k=1-(BEAM.until-t)/Math.max(.01,P.beamSweep); // 0..1 across the sweep
+    // Ease: a real lamp rotating at constant rate crosses the field fastest
+    // when it points at you, because the bearing is a rotation projected onto
+    // a plane. smoothstep-inverse gives that accelerate-through-middle feel.
+    const e=k<.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2;
+    const span=Math.PI*0.62;
+    BEAM.a=BEAM.dir*(-span/2+e*span);
+    BEAM.on=1;
+  } else if(BEAM.left>0){
+    BEAM.left--;
+    if(BEAM.left>0){ BEAM.until=t+P.beamSweep; }        // double: go again now
+    else {
+      const lo=Math.min(P.beamGapMin,P.beamGapMax), hi=Math.max(P.beamGapMin,P.beamGapMax);
+      BEAM.next=t+lo+Math.random()*(hi-lo);
+    }
+    BEAM.on=0;
+  } else BEAM.on=0;
+}
+
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000); last=now;
   fps+= ((1/Math.max(1e-4,dt))-fps)*0.08;
   if(!paused) t+=dt;
+  beamStep(t);
 
   const hz=H*P.horizon, N=P.lines|0;
 
@@ -920,7 +976,32 @@ function frame(now){
       // which is why the water read as "bright lines and dim lines" with nothing
       // in between. Mapping lit through its own range and applying a gamma uses
       // the whole scale, and `floor` stays available as a real minimum.
-      const lit=crest*(1-P.slopeLit) + slope*P.slopeLit;
+      let lit=crest*(1-P.slopeLit) + slope*P.slopeLit;
+      // Lighthouse. The beam is an angular wedge in the horizontal plane: this
+      // segment's bearing is its offset from screen centre divided by its depth,
+      // so near segments need a big x offset to leave the cone and far ones a
+      // small one -- that divergence is what makes the lit patch read as a cone
+      // lying ON the water rather than a stripe painted over it.
+      if(BEAM.on){
+        // Depth from `near` (1 = foreground): the draw pass is a separate loop
+        // from the build pass, so the build pass's yDepth is out of scope here.
+        const bd=1-near;
+        const bearing=Math.atan2((a2[0]-W*0.5)/W, 0.12+bd*1.6);
+        const d=Math.abs(bearing-BEAM.a);
+        const hw=Math.max(.01,P.beamWidth);
+        // Soft-edged wedge: full inside, falling to 0 across the outer `soft`.
+        const inner=hw*(1-P.beamSoft);
+        const cone=d<=inner ? 1
+                 : d>=hw ? 0
+                 : 1-(d-inner)/Math.max(1e-4,hw-inner);
+        if(cone>0){
+          // Specular: faces tilted toward the lamp bounce it at the viewer.
+          // slope is |dy/dx| smoothed, so it stands in for how far this facet is
+          // tilted out of horizontal -- crests glint, flat troughs stay dark.
+          const glint=1+P.beamLift*Math.min(1,slope*0.8);
+          lit+=P.beam*cone*cone*glint*0.45;
+        }
+      }
       const litN=Math.min(1,Math.max(0,lit/Math.max(.01,P.litRange)));
       const shade=Math.pow(litN,Math.max(.05,P.litGamma));
       // crest contrast scales the SHADING against the floor, so 0 gives flat
