@@ -226,7 +226,7 @@ const DEF={
   // without competing with the rope's own randomness for the same channel.
 
   // look
-  bright:1.55, glow:4.2, width:1.0, crest:.62,
+  bright:1.0, glow:4.2, width:1.0, crest:1.4,
   bands:64,           // brightness levels. This is a BATCHING budget, not a look:
                       // each band is one beginPath/stroke for every segment in
                       // it, so the count trades draw calls against tonal
@@ -923,7 +923,14 @@ function frame(now){
       const lit=crest*(1-P.slopeLit) + slope*P.slopeLit;
       const litN=Math.min(1,Math.max(0,lit/Math.max(.01,P.litRange)));
       const shade=Math.pow(litN,Math.max(.05,P.litGamma));
-      let al=base*(P.floor+(1-P.floor)*shade)*(1+P.crest);
+      // crest contrast scales the SHADING against the floor, so 0 gives flat
+      // lines at the floor value and higher values open the gap between lit and
+      // unlit. It used to sit outside as *(1+P.crest) -- a flat multiplier on the
+      // whole line, which is just `bright` under another name, and with bright at
+      // 1.55 it pinned 90-100% of segments at alpha 1. One band held everything:
+      // the tonal range existed in `shade` and was then flattened against the
+      // ceiling. Keep the gain low enough that shade still has somewhere to go.
+      let al=base*Math.min(1,P.floor+(1-P.floor)*shade*P.crest);
       if(al<0.004)continue;
       // Dither. More bands shrink the steps but leave the boundaries in fixed
       // places, so what is left of the terracing still runs as continuous
