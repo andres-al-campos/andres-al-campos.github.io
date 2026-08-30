@@ -75,6 +75,8 @@ const SPEC=[
  ]],
  ['gLook',[
   ['bright','brightness',.1,4,.05,2],
+  ['ptStep','point spacing',1,8,.5,1],
+  ['gerstner','crest iterations',0,4,1,0],
   ['bands','brightness levels',4,64,1,0],
   ['wSteps','width buckets',1,6,1,0],
   ['dithAmt','dither',0,1.5,.05,2],

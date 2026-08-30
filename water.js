@@ -238,6 +238,12 @@ const DEF={
                       // sky. Only the lamp gets a halo, which is the one part
                       // real photographs show without fog.
   wSteps:2,           // line-width buckets. Multiplies stroke count; see pass 3.
+  // Points per line are spaced ptStep CSS px apart, so this scales the whole
+  // geometry pass with viewport width: at 2560px, 3.0 is ~850 points x N lines.
+  ptStep:3.0,
+  // Gerstner refinement iterations. Each one costs a full simAtBox (up to 6
+  // height samples on far rows), so this multiplies the inner loop directly.
+  gerstner:3,
   bands:48,           // brightness levels. This is a BATCHING budget, not a look:
                       // each band is one beginPath/stroke for every segment in
                       // it, so the count trades draw calls against tonal
@@ -795,7 +801,7 @@ function frame(now){
   // Every line is built before any is drawn, so the draw pass can run far-to-near
   // and let nearer ropes occlude the ones behind. One shared x grid across every
   // line, so point j of line i sits directly in front of point j of line i+1.
-  const step=3.0, M=Math.ceil((W+80)/step)+1;
+  const step=Math.max(1,P.ptStep), M=Math.ceil((W+80)/step)+1;
   const PY_=new Float64Array(N*M);          // y of every point
   const baseY=new Float64Array(N), ampA=new Float64Array(N), nearA=new Float64Array(N);
   const kxA=new Float64Array(N);   // per-line wavenumber, needed by the foam test in pass 3
@@ -865,7 +871,8 @@ function frame(now){
       let sx=gx;
       if(P.steep>0){
         const s0=gx;
-        for(let q=0;q<3;q++) sx=s0+P.steep*3.0*simAtBox(sx,gy,gyW)*P.simGain;
+        const gi=P.gerstner|0;
+        for(let q=0;q<gi;q++) sx=s0+P.steep*3.0*simAtBox(sx,gy,gyW)*P.simGain;
       }
       let z=simAtBox(sx,gy,gyW)*P.simGain;
       PY_[row+j]=y0 - z*amp;
