@@ -697,7 +697,11 @@ function frame(now){
     // .copy in the lab file, .masthead on the live page -- whichever copy block
     // the horizon has to clear.
     const ce=document.querySelector('.copy, .masthead');
-    if(ce){const cb=ce.getBoundingClientRect().bottom+P.copyClear;
+    if(ce){
+      // Relative to the CANVAS, not the viewport. Both rects are viewport-based,
+      // so subtracting cancels the scroll offset -- otherwise scrolling the page
+      // walks the copy up the screen and drags the horizon along with it.
+      const cb=ce.getBoundingClientRect().bottom-cv.getBoundingClientRect().top+P.copyClear;
       if(cb>hz) hz=Math.min(H*0.82,cb);}
   }
   const N=P.lines|0;
