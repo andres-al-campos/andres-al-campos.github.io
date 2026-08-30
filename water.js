@@ -30,6 +30,27 @@ const BARE=(function(){
 })();
 WATER.bare=BARE;
 
+// ?bare is a measuring tool, so it carries its own readout -- the panel is
+// #tune-only and there would otherwise be no fps number to read.
+let bareHud=null;
+if(/[?&]bare=/.test(location.search)){
+  addEventListener('DOMContentLoaded',()=>{
+    bareHud=document.createElement('div');
+    bareHud.style.cssText='position:fixed;left:10px;top:10px;z-index:99999;'+
+      'font:600 13px/1.5 ui-monospace,Menlo,monospace;color:#F0A94C;'+
+      'background:rgba(7,10,16,.92);border:1px solid #1B2430;border-radius:7px;'+
+      'padding:7px 11px;white-space:pre;pointer-events:none';
+    document.body.appendChild(bareHud);
+  });
+}
+const BARE_WHAT=['clear only','+ sky / sea / lighthouse','+ wave simulation',
+                 '+ line geometry (no strokes)','full render'];
+function bareReport(fps,N){
+  if(!bareHud) return;
+  bareHud.textContent='bare='+BARE+'  '+fps.toFixed(0)+' fps\n'+BARE_WHAT[BARE]+
+    (N?('\nlines '+N):'');
+}
+
 let W=0,H=0,DPR=1;
 function fit(){
   DPR=Math.min(2,window.devicePixelRatio||1);
@@ -651,6 +672,7 @@ function frame(now){
   if(BARE===0){                       // floor: clear a canvas, nothing more
     g.globalCompositeOperation='source-over';
     g.fillStyle='#070A10'; g.fillRect(0,0,W,H);
+    bareReport(fps,0);
     if(WATER.onFrame) WATER.onFrame(fps,0,DPR);
     requestAnimationFrame(tick); return;
   }
@@ -725,6 +747,7 @@ function frame(now){
   g.fillStyle=sea;g.fillRect(0,hz,W,H-hz);
 
   if(BARE===1){                       // gradients and lamp, no water at all
+    bareReport(fps,0);
     if(WATER.onFrame) WATER.onFrame(fps,0,DPR);
     requestAnimationFrame(tick); return;
   }
@@ -761,6 +784,7 @@ function frame(now){
   }
   if(BARE===2){                       // sim runs, nothing reads it
     g.globalCompositeOperation='source-over';
+    bareReport(fps,0);
     if(WATER.onFrame) WATER.onFrame(fps,0,DPR);
     requestAnimationFrame(tick); return;
   }
@@ -850,6 +874,7 @@ function frame(now){
 
   if(BARE===3){                       // geometry computed, nothing stroked
     g.globalCompositeOperation='source-over';
+    bareReport(fps,N);
     if(WATER.onFrame) WATER.onFrame(fps,N,DPR);
     requestAnimationFrame(tick); return;
   }
@@ -1142,6 +1167,7 @@ function frame(now){
     g.fillRect(tx-tw*0.30,ty-tw*0.14,tw*0.60,tw*0.54);
   }
 
+  bareReport(fps,N);
   if(WATER.onFrame) WATER.onFrame(fps,N,DPR);
   requestAnimationFrame(tick);
 }
