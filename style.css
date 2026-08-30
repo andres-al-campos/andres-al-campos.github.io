@@ -357,3 +357,52 @@ footer a:hover { color: var(--amber); border-bottom-color: currentColor; }
   .mark { width: 42px; height: 42px; }
   .row .arrow { display: none; }
 }
+
+/* ---- hero water ----
+   Full-bleed: the lighthouse sweep needs the horizontal room, and a sea boxed
+   to the 880px text column loses the sense of scale. The masthead keeps its own
+   width and rides on top.
+
+   The hero is dark in both colour schemes. The scene is a night sea, so there
+   is no light-mode version of it -- a dark band under a light page is an
+   ordinary masthead treatment, a daylit water sim is not. */
+.hero {
+  position: relative;
+  margin: 0 calc(-1 * clamp(20px, 5vw, 40px));  /* cancel body padding */
+  padding: 0 clamp(20px, 5vw, 40px);
+  /* Taller than the masthead needs to be: copyClear drops the horizon below the
+     copy, so the sea only gets whatever is left underneath. Without this the
+     water is a strip. */
+  min-height: clamp(560px, 88vh, 900px);
+  overflow: hidden;
+  background: #0B0D12;
+  --ink: #E8E6E1;
+  --soft: #8A8894;
+  --faint: #7E7C88;
+  --amber: #E8A24C;
+  --glow: rgba(232, 162, 76, .16);
+}
+.hero #scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  z-index: 0;
+}
+.hero .masthead { position: relative; z-index: 1; padding-bottom: clamp(24px, 4vw, 44px); }
+
+/* The renderer's copyClear already pushes the horizon below the masthead, so
+   the text sits on sky rather than on water. This is just insurance for the
+   descenders that reach the waterline -- heavy enough to hold contrast, light
+   enough to leave the scene alone. */
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 55%;
+  background: linear-gradient(to bottom,
+    rgba(11,13,18,.55) 0%, rgba(11,13,18,.35) 60%, rgba(11,13,18,0) 100%);
+  pointer-events: none;
+  z-index: 0;
+}

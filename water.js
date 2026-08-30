@@ -20,12 +20,33 @@ window.WATER=WATER;
 let W=0,H=0,DPR=1;
 function fit(){
   DPR=Math.min(2,window.devicePixelRatio||1);
-  const box=cv.parentElement||document.body;
-  W=box.clientWidth||innerWidth; H=box.clientHeight||innerHeight;
+  // A fixed canvas (the lab file) covers the viewport; an absolute one fills
+  // its positioned parent (the live page's hero). Measuring the element itself
+  // does not work -- we set its inline size below, so it would measure its own
+  // output -- so take the size from whichever box it is stretched to.
+  const box=cv.offsetParent;
+  if(getComputedStyle(cv).position==='fixed'||!box){ W=innerWidth; H=innerHeight; }
+  else { W=box.clientWidth; H=box.clientHeight; }
   cv.width=W*DPR;cv.height=H*DPR;cv.style.width=W+'px';cv.style.height=H+'px';
   g.setTransform(DPR,0,0,DPR,0,0);
 }
-addEventListener('resize',fit);fit();
+addEventListener('resize',fit);
+// The hero can change height without the window resizing -- fonts landing, the
+// copy rewrapping, a stylesheet arriving late. Watch the box we size against.
+if('ResizeObserver' in window){
+  // Only ever react to a size we did not cause. fit() writes the canvas's inline
+  // size, which can feed back through the parent's layout; comparing against the
+  // last size we applied breaks that loop.
+  let lastW=-1,lastH=-1;
+  const ro=new ResizeObserver(()=>{
+    const box=cv.offsetParent;
+    const w=box?box.clientWidth:innerWidth, h=box?box.clientHeight:innerHeight;
+    if(w===lastW&&h===lastH) return;
+    lastW=w; lastH=h; fit();
+  });
+  ro.observe(cv.offsetParent||document.body);
+}
+fit();
 
 // ---- parameters -----------------------------------------------------------
 // AXES, as specified: x runs left-right across the screen, y runs front-to-back
@@ -623,7 +644,9 @@ function frame(now){
   // simply has no room, so the horizon yields instead of the text.
   let hz=H*P.horizon;
   if(P.copyClear>0){
-    const ce=document.querySelector('.copy');
+    // .copy in the lab file, .masthead on the live page -- whichever copy block
+    // the horizon has to clear.
+    const ce=document.querySelector('.copy, .masthead');
     if(ce){const cb=ce.getBoundingClientRect().bottom+P.copyClear;
       if(cb>hz) hz=Math.min(H*0.82,cb);}
   }
@@ -646,7 +669,7 @@ function frame(now){
   // Read from the DOM rather than hardcoded: the copy is clamp()-positioned and
   // its height changes with wrapping, so a fixed rect would drift.
   if(P.beamGuard>0){
-    const ce=document.querySelector('.copy');
+    const ce=document.querySelector('.copy, .masthead');
     if(ce){const r=ce.getBoundingClientRect();
       GUARD.on=1; GUARD.x0=r.left; GUARD.x1=r.right; GUARD.y1=r.bottom;
     } else GUARD.on=0;

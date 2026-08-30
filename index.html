@@ -5,12 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alex Campos — tools that take the friction out</title>
 <meta name="description" content="Browser extensions, menu bar apps, iPhone apps, and analysis pipelines. Each one started as something that annoyed me often enough to be worth a weekend, or a year.">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body>
 
 <div class="bloom" aria-hidden="true"><i></i><i></i><i></i></div>
 
+<div class="hero">
+  <canvas id="scene" aria-hidden="true"></canvas>
 <header class="masthead">
   <p class="who">Alex Campos</p>
   <h1>Tools that take the <span class="lit">friction out</span>.</h1>
@@ -24,6 +26,7 @@
     <a href="mailto:andres.al.campos@gmail.com">Email</a>
   </p>
 </header>
+</div>
 
 <main>
   <nav class="filters" id="filters" aria-label="Filter projects by platform"><span class="pill" id="pill"></span></nav>
@@ -35,6 +38,15 @@
   <p>Built as a static page. <a href="https://github.com/andres-al-campos/andres-al-campos.github.io">Source</a>.</p>
 </footer>
 
+<script src="water.js"></script>
+<script>
+// The tuning panel is a prototyping tool, not part of the page. #tune loads it.
+if (location.hash === '#tune') {
+  var s = document.createElement('script');
+  s.src = 'designs/water-panel.js';
+  document.head.appendChild(s);
+}
+</script>
 <script src="marks.js"></script>
 <script src="projects.js"></script>
 <script>
