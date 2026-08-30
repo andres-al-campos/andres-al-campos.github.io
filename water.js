@@ -239,10 +239,12 @@ const DEF={
                       // real photographs show without fog.
   wSteps:2,           // line-width buckets. Multiplies stroke count; see pass 3.
   // Points per line are spaced ptStep CSS px apart, so this scales the whole
-  // geometry pass with viewport width: at 2560px, 3.0 is ~850 points x N lines.
-  ptStep:3.0,
+  // geometry pass with viewport width. Nearly all the frame cost is per-point:
+  // halving the grid resolution or the brightness bands measured as noise, while
+  // this and ptRef together took a 2000px window from 40 to 55 fps.
+  ptStep:4.5,
   ptScale:1,          // 1 = widen point spacing on large viewports, 0 = off
-  ptRef:1440,         // viewport width below which spacing is left alone
+  ptRef:1100,         // viewport width below which spacing is left alone
   // Gerstner refinement iterations. Each one costs a full simAtBox (up to 6
   // height samples on far rows), so this multiplies the inner loop directly.
   gerstner:3,
