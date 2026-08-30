@@ -23,7 +23,9 @@ if(!document.getElementById('panel')){
 
 WATER.onFrame=function(fps,N,DPR){
   document.getElementById('hud').innerHTML=
-    'fps <b>'+fps.toFixed(0)+'</b> · lines <b>'+N+'</b> · dpr <b>'+DPR+'</b>';
+    'fps <b>'+fps.toFixed(0)+'</b> · lines <b>'+N+'</b> · dpr <b>'+DPR+'</b>'+
+    (WATER.step?' · step <b>'+WATER.step.toFixed(1)+'</b> · pts <b>'+
+      (WATER.pts/1000).toFixed(0)+'k</b>':'');
 };
 
 const SPEC=[
@@ -76,6 +78,8 @@ const SPEC=[
  ['gLook',[
   ['bright','brightness',.1,4,.05,2],
   ['ptStep','point spacing',1,8,.5,1],
+  ['ptScale','scale w/ width',0,1,1,0],
+  ['ptRef','scale reference px',900,2560,20,0],
   ['gerstner','crest iterations',0,4,1,0],
   ['bands','brightness levels',4,64,1,0],
   ['wSteps','width buckets',1,6,1,0],

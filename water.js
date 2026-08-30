@@ -241,6 +241,8 @@ const DEF={
   // Points per line are spaced ptStep CSS px apart, so this scales the whole
   // geometry pass with viewport width: at 2560px, 3.0 is ~850 points x N lines.
   ptStep:3.0,
+  ptScale:1,          // 1 = widen point spacing on large viewports, 0 = off
+  ptRef:1440,         // viewport width below which spacing is left alone
   // Gerstner refinement iterations. Each one costs a full simAtBox (up to 6
   // height samples on far rows), so this multiplies the inner loop directly.
   gerstner:3,
@@ -801,7 +803,15 @@ function frame(now){
   // Every line is built before any is drawn, so the draw pass can run far-to-near
   // and let nearer ropes occlude the ones behind. One shared x grid across every
   // line, so point j of line i sits directly in front of point j of line i+1.
-  const step=Math.max(1,P.ptStep), M=Math.ceil((W+80)/step)+1;
+  // Point spacing widens on large viewports. Cost is linear in width, so a 2560
+  // window was paying 2.7x a 900 one for the same scene -- and a wide display is
+  // exactly where the frame budget is already tightest. Above the reference
+  // width, spacing grows with sqrt(W/ref): 2560 lands at 75% of the linear point
+  // count, 3440 at 65%, while anything at or below the reference is untouched.
+  // Still monotonic, so a bigger screen never renders coarser in absolute terms.
+  const wScale=P.ptScale>0?Math.max(1,Math.sqrt(W/Math.max(320,P.ptRef))):1;
+  const step=Math.max(1,P.ptStep*wScale), M=Math.ceil((W+80)/step)+1;
+  WATER.step=step; WATER.pts=M*N;   // shown in the hud; the scaling is otherwise invisible
   const PY_=new Float64Array(N*M);          // y of every point
   const baseY=new Float64Array(N), ampA=new Float64Array(N), nearA=new Float64Array(N);
   const kxA=new Float64Array(N);   // per-line wavenumber, needed by the foam test in pass 3
