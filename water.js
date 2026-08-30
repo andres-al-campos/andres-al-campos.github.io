@@ -17,6 +17,19 @@ const g=cv.getContext('2d');
 const WATER={paused:false, onFrame:null};
 window.WATER=WATER;
 
+// ---- ?bare=N -- bisect the render cost -------------------------------------
+// Each level adds one stage back, so reloading through 0..4 says WHERE the cost
+// appears rather than only whether it exists. Compare against level 0: that is a
+// cleared canvas plus a rAF loop and nothing else, so if level 0 is already slow
+// the cost is not in this file at all.
+//   0 clear only   1 +sky/sea/lighthouse   2 +wave simulation
+//   3 +line geometry (no strokes)          4 full render (default)
+const BARE=(function(){
+  const m=/[?&]bare=(\d)/.exec(location.search);
+  return m?Math.max(0,Math.min(4,+m[1])):4;
+})();
+WATER.bare=BARE;
+
 let W=0,H=0,DPR=1;
 function fit(){
   DPR=Math.min(2,window.devicePixelRatio||1);
@@ -635,6 +648,13 @@ function frame(now){
   if(!WATER.paused) t+=dt;
   beamStep(t);
 
+  if(BARE===0){                       // floor: clear a canvas, nothing more
+    g.globalCompositeOperation='source-over';
+    g.fillStyle='#070A10'; g.fillRect(0,0,W,H);
+    if(WATER.onFrame) WATER.onFrame(fps,0,DPR);
+    requestAnimationFrame(tick); return;
+  }
+
   // Horizon, floored below the masthead copy. Measured at 1100x560: the copy
   // bottom (201px) sits past a 0.34*H horizon (190px) and the white wave lines
   // run straight under the intro paragraph -- contrast 3.14 average and 1.0
@@ -704,6 +724,11 @@ function frame(now){
     q.addColorStop(0,'#0A121C');q.addColorStop(1,'#070A10');return q;});
   g.fillStyle=sea;g.fillRect(0,hz,W,H-hz);
 
+  if(BARE===1){                       // gradients and lamp, no water at all
+    if(WATER.onFrame) WATER.onFrame(fps,0,DPR);
+    requestAnimationFrame(tick); return;
+  }
+
   g.globalCompositeOperation='lighter';
   g.lineCap='round';
 
@@ -734,6 +759,12 @@ function frame(now){
       SIM.acc-=fixed; n++;
     }
   }
+  if(BARE===2){                       // sim runs, nothing reads it
+    g.globalCompositeOperation='source-over';
+    if(WATER.onFrame) WATER.onFrame(fps,0,DPR);
+    requestAnimationFrame(tick); return;
+  }
+
   const R=lineRandom(N,P.seed|0,P.randScale,P.randOct|0);
 
   // ---- pass 1: build every line -----------------------------------------
@@ -815,6 +846,12 @@ function frame(now){
       let z=simAtBox(sx,gy,gyW)*P.simGain;
       PY_[row+j]=y0 - z*amp;
     }
+  }
+
+  if(BARE===3){                       // geometry computed, nothing stroked
+    g.globalCompositeOperation='source-over';
+    if(WATER.onFrame) WATER.onFrame(fps,N,DPR);
+    requestAnimationFrame(tick); return;
   }
 
   // ---- pass 3: draw ------------------------------------------------------
