@@ -26,7 +26,8 @@ WATER.onFrame=function(fps,N,DPR){
     'fps <b>'+fps.toFixed(0)+'</b> · lines <b>'+N+'</b> · dpr <b>'+DPR+'</b>'+
     (WATER.step?' · step <b>'+WATER.step.toFixed(1)+'</b> · pts <b>'+
       (WATER.pts/1000).toFixed(0)+'k</b>':'')+
-    (WATER.quality>1.01?' · <b>adapted '+WATER.quality.toFixed(2)+'x</b>':'');
+    (WATER.quality>1.01?' · <b>adapted '+WATER.quality.toFixed(2)+'x</b>':'')+
+    (WATER.glowFade<0.99?' · <b>glow '+(WATER.glowFade*100).toFixed(0)+'%</b>':'');
 };
 
 const SPEC=[

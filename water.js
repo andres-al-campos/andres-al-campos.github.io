@@ -386,27 +386,43 @@ let t=0, last=performance.now(), fps=60;
 // and cheaper. Nearly all frame cost is per-point, so this is close to a direct
 // dial on frame time.
 let quality=1;
+// Glow multiplier, 1 = full. Only touched once point spacing is at adaptMax.
+let glowFade=1;
 // Wait for the tab to settle -- first frames include layout, font and decode
 // work that has nothing to do with how fast this machine renders water, and
 // reacting to them would coarsen a display that never needed it.
 let adaptFrames=0;
 function adaptQuality(){
-  if(P.adapt<=0){ quality=1; return; }
+  if(P.adapt<=0){ quality=1; glowFade=1; return; }
   if(++adaptFrames<90) return;                 // ~1.5s of warm-up
   // Only act on a sustained reading. fps is smoothed at 0.08, so a single long
   // frame (a GC pause, another tab waking up) moves it a little and a genuine
   // shortfall moves it a lot; the deadband keeps the two apart.
-  if(fps<P.adaptMin && quality<P.adaptMax){
-    // Jump by how far short we are, not by a fixed nudge. Cost is ~linear in
-    // point count and point count ~1/spacing, so spacing needs to scale by about
-    // adaptMin/fps to hit target; capped per move so one bad frame cannot halve
-    // the resolution, and overshooting is cheap to walk back.
-    const want=Math.min(1.6,Math.max(1.05,P.adaptMin/Math.max(5,fps)));
-    quality=Math.min(P.adaptMax,quality*want);
-    adaptFrames=45;                            // let it settle before judging again
-  } else if(fps>P.adaptMin+18 && quality>1){
-    quality=Math.max(1,quality/1.03);          // recover slower than we back off
-    adaptFrames=90;
+  if(fps<P.adaptMin){
+    if(quality<P.adaptMax){
+      // Jump by how far short we are, not by a fixed nudge. Cost is ~linear in
+      // point count and point count ~1/spacing, so spacing needs to scale by about
+      // adaptMin/fps to hit target; capped per move so one bad frame cannot halve
+      // the resolution, and overshooting is cheap to walk back.
+      const want=Math.min(1.6,Math.max(1.05,P.adaptMin/Math.max(5,fps)));
+      quality=Math.min(P.adaptMax,quality*want);
+      adaptFrames=45;                          // let it settle before judging again
+    } else if(glowFade>0){
+      // Spacing is spent and we are still short, so the machine is limited by
+      // pixels rather than points -- fill rate does not care how many segments
+      // there are, only how much area they cover. Fade the glow out instead.
+      glowFade=Math.max(0,glowFade-0.15);
+      adaptFrames=45;
+    }
+  } else if(fps>P.adaptMin+4){
+    // +4, not a wide band: on a 60Hz display fps tops out near 60, so a recovery
+    // threshold above that can never be met and quality would ratchet down and
+    // stay there. The asymmetric rates below are what damp the oscillation.
+    if(glowFade<1){ glowFade=Math.min(1,glowFade+0.05); adaptFrames=90; }
+    else if(quality>1){
+      quality=Math.max(1,quality/1.03);        // recover slower than we back off
+      adaptFrames=90;
+    }
   }
 }
 
@@ -856,7 +872,7 @@ function frame(now){
   // on a fast box still crawls on a slow one, and a sea running at 20fps is worse
   // than no sea. quality falls until frames land in budget; see adaptQuality.
   const step=Math.max(1,P.ptStep*wScale*quality), M=Math.ceil((W+80)/step)+1;
-  WATER.step=step; WATER.pts=M*N; WATER.quality=quality;   // shown in the hud
+  WATER.step=step; WATER.pts=M*N; WATER.quality=quality; WATER.glowFade=glowFade;
   const PY_=new Float64Array(N*M);          // y of every point
   const baseY=new Float64Array(N), ampA=new Float64Array(N), nearA=new Float64Array(N);
   const kxA=new Float64Array(N);   // per-line wavenumber, needed by the foam test in pass 3
@@ -963,6 +979,7 @@ function frame(now){
   }
   const bucket=DRAW.buf, foamAll=[];
   const lwLo=0.5*P.width, lwHi=2.0*P.width, lwSpan=Math.max(1e-6,lwHi-lwLo);
+  const glowMul=quality>=P.adaptMax-0.01?glowFade:1;   // dimmed only once spacing is spent
   for(let i=0;i<N;i++){
     const row=i*M, y0=baseY[i], amp=ampA[i], near=nearA[i], kxi=kxA[i];
 
@@ -1140,7 +1157,14 @@ function frame(now){
         const lw=lwLo+lwSpan*(wq+0.5)/WSTEPS;
         g.beginPath();
         for(let k2=0;k2<seg.length;k2+=2){g.moveTo(seg[k2][0],seg[k2][1]);g.lineTo(seg[k2+1][0],seg[k2+1][1]);}
-        g.strokeStyle='rgba('+col+','+(al*0.20).toFixed(4)+')';g.lineWidth=lw*P.glow;g.stroke();
+        // The glow is a second stroke of every segment at P.glow x the width, so
+        // it costs several times the fill of the line itself. On a fill-limited
+        // machine that is the single biggest thing to give up, and it fades out
+        // rather than disappearing -- see adaptQuality.
+        if(glowMul>0.02){
+          g.strokeStyle='rgba('+col+','+(al*0.20*glowMul).toFixed(4)+')';
+          g.lineWidth=lw*P.glow;g.stroke();
+        }
         g.strokeStyle='rgba('+col+','+Math.min(1,al).toFixed(4)+')';g.lineWidth=lw;g.stroke();
       }
     }
