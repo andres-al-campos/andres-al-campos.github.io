@@ -92,7 +92,7 @@ button.act:hover{border-color:var(--amber);color:var(--amber)}
   <button class="act" data-pre="swell">SWELL</button>
   <button class="act" data-pre="chop">CHOP</button>
  </div>
- <div class="btns"><button class="act" id="copy">COPY SETTINGS</button><button class="act" id="reset">RESET</button></div>
+ <div class="btns"><button class="act" id="save">SET AS DEFAULT</button><button class="act" id="copy">COPY SETTINGS</button><button class="act" id="reset">RESET</button></div>
  <pre id="out"></pre>
  <p class="note">space = pause · h = hide panel</p>
 </div>
@@ -296,7 +296,21 @@ const DEF={
   randScale:8,        // lines per random anchor — how slowly randomness drifts
   randOct:4,          // octaves of detail on top of that drift
 };
-const P={...DEF};
+// Live tweaks are lost on reload unless saved. SET AS DEFAULT writes the current
+// values here; RESET drops them and returns to the DEF block above.
+const STORE='rws.defaults';
+function loadSaved(){
+  try{
+    const raw=localStorage.getItem(STORE); if(!raw) return null;
+    const o=JSON.parse(raw); if(!o||typeof o!=='object') return null;
+    // Only accept keys DEF knows about, so a stale save can't inject junk.
+    const clean={};
+    for(const k of Object.keys(DEF)) if(typeof o[k]==='number'&&isFinite(o[k])) clean[k]=o[k];
+    return clean;
+  }catch(e){ return null; }
+}
+const SAVED=loadSaved();
+const P={...DEF,...(SAVED||{})};
 
 const SPEC=[
  ['gField',[
@@ -410,7 +424,18 @@ const PRE={
 };
 document.querySelectorAll('[data-pre]').forEach(b=>b.addEventListener('click',()=>{
   Object.assign(P,DEF,PRE[b.dataset.pre]);sync();}));
-document.getElementById('reset').addEventListener('click',()=>{Object.assign(P,DEF);sync();});
+document.getElementById('reset').addEventListener('click',()=>{
+  try{ localStorage.removeItem(STORE); }catch(e){}
+  Object.assign(P,DEF);sync();flash('reset','RESET');});
+document.getElementById('save').addEventListener('click',()=>{
+  const o={}; for(const k of Object.keys(DEF)) o[k]=P[k];
+  try{ localStorage.setItem(STORE,JSON.stringify(o)); flash('save','SAVED'); }
+  catch(e){ flash('save','SAVE FAILED'); }});
+// Confirm in the button label; there is no other feedback that a click landed.
+function flash(id,msg){
+  const b=document.getElementById(id), was=b.textContent;
+  b.textContent=msg; setTimeout(()=>{b.textContent=was;},900);
+}
 
 // Copy the live values as a paste-ready DEF block. Written to the page as well
 // as the clipboard, since clipboard writes fail without a user gesture in some
