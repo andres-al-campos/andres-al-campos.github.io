@@ -248,6 +248,12 @@ const DEF={
   // Gerstner refinement iterations. Each one costs a full simAtBox (up to 6
   // height samples on far rows), so this multiplies the inner loop directly.
   gerstner:3,
+  // Adaptive quality. A default tuned on one machine is wrong on every other
+  // one, and slow is the failure that shows. Below adaptMin fps the renderer
+  // coarsens point spacing until frames fit, up to adaptMax x the tuned spacing.
+  adapt:1,            // 0 disables, pinning quality to the tuned values
+  adaptMin:50,        // target floor, in fps
+  adaptMax:2.2,       // most it may coarsen: 4.5px spacing -> 9.9px
   bands:48,           // brightness levels. This is a BATCHING budget, not a look:
                       // each band is one beginPath/stroke for every segment in
                       // it, so the count trades draw calls against tonal
@@ -374,6 +380,35 @@ function rowY(i,N,hz){
 }
 
 let t=0, last=performance.now(), fps=60;
+
+// ---- adaptive quality -------------------------------------------------------
+// Point spacing is multiplied by this. 1 = the tuned defaults; higher = coarser
+// and cheaper. Nearly all frame cost is per-point, so this is close to a direct
+// dial on frame time.
+let quality=1;
+// Wait for the tab to settle -- first frames include layout, font and decode
+// work that has nothing to do with how fast this machine renders water, and
+// reacting to them would coarsen a display that never needed it.
+let adaptFrames=0;
+function adaptQuality(){
+  if(P.adapt<=0){ quality=1; return; }
+  if(++adaptFrames<90) return;                 // ~1.5s of warm-up
+  // Only act on a sustained reading. fps is smoothed at 0.08, so a single long
+  // frame (a GC pause, another tab waking up) moves it a little and a genuine
+  // shortfall moves it a lot; the deadband keeps the two apart.
+  if(fps<P.adaptMin && quality<P.adaptMax){
+    // Jump by how far short we are, not by a fixed nudge. Cost is ~linear in
+    // point count and point count ~1/spacing, so spacing needs to scale by about
+    // adaptMin/fps to hit target; capped per move so one bad frame cannot halve
+    // the resolution, and overshooting is cheap to walk back.
+    const want=Math.min(1.6,Math.max(1.05,P.adaptMin/Math.max(5,fps)));
+    quality=Math.min(P.adaptMax,quality*want);
+    adaptFrames=45;                            // let it settle before judging again
+  } else if(fps>P.adaptMin+18 && quality>1){
+    quality=Math.max(1,quality/1.03);          // recover slower than we back off
+    adaptFrames=90;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // The water itself.
@@ -676,6 +711,7 @@ function beamStep(t){
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000); last=now;
   fps+= ((1/Math.max(1e-4,dt))-fps)*0.08;
+  adaptQuality();
   if(!WATER.paused) t+=dt;
   beamStep(t);
 
@@ -816,8 +852,11 @@ function frame(now){
   // count, 3440 at 65%, while anything at or below the reference is untouched.
   // Still monotonic, so a bigger screen never renders coarser in absolute terms.
   const wScale=P.ptScale>0?Math.max(1,Math.sqrt(W/Math.max(320,P.ptRef))):1;
-  const step=Math.max(1,P.ptStep*wScale), M=Math.ceil((W+80)/step)+1;
-  WATER.step=step; WATER.pts=M*N;   // shown in the hud; the scaling is otherwise invisible
+  // ...and again by what the machine can actually keep up with. A default tuned
+  // on a fast box still crawls on a slow one, and a sea running at 20fps is worse
+  // than no sea. quality falls until frames land in budget; see adaptQuality.
+  const step=Math.max(1,P.ptStep*wScale*quality), M=Math.ceil((W+80)/step)+1;
+  WATER.step=step; WATER.pts=M*N; WATER.quality=quality;   // shown in the hud
   const PY_=new Float64Array(N*M);          // y of every point
   const baseY=new Float64Array(N), ampA=new Float64Array(N), nearA=new Float64Array(N);
   const kxA=new Float64Array(N);   // per-line wavenumber, needed by the foam test in pass 3

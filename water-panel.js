@@ -25,7 +25,8 @@ WATER.onFrame=function(fps,N,DPR){
   document.getElementById('hud').innerHTML=
     'fps <b>'+fps.toFixed(0)+'</b> · lines <b>'+N+'</b> · dpr <b>'+DPR+'</b>'+
     (WATER.step?' · step <b>'+WATER.step.toFixed(1)+'</b> · pts <b>'+
-      (WATER.pts/1000).toFixed(0)+'k</b>':'');
+      (WATER.pts/1000).toFixed(0)+'k</b>':'')+
+    (WATER.quality>1.01?' · <b>adapted '+WATER.quality.toFixed(2)+'x</b>':'');
 };
 
 const SPEC=[
@@ -80,6 +81,9 @@ const SPEC=[
   ['ptStep','point spacing',1,8,.5,1],
   ['ptScale','scale w/ width',0,1,1,0],
   ['ptRef','scale reference px',900,2560,20,0],
+  ['adapt','adapt to fps',0,1,1,0],
+  ['adaptMin','fps floor',24,60,1,0],
+  ['adaptMax','max coarsening',1,4,.1,1],
   ['gerstner','crest iterations',0,4,1,0],
   ['bands','brightness levels',4,64,1,0],
   ['wSteps','width buckets',1,6,1,0],
