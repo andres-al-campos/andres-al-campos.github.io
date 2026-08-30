@@ -256,7 +256,7 @@ const DEF={
                       // LANDS -- so there is deliberately no cone drawn in the
                       // sky. Only the lamp gets a halo, which is the one part
                       // real photographs show without fog.
-  bands:64,           // brightness levels. This is a BATCHING budget, not a look:
+  bands:48,           // brightness levels. This is a BATCHING budget, not a look:
                       // each band is one beginPath/stroke for every segment in
                       // it, so the count trades draw calls against tonal
                       // smoothness. Measured: 32->118fps, 64->100, 96->75,
