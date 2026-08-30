@@ -263,6 +263,7 @@ const DEF={
                       // LANDS -- so there is deliberately no cone drawn in the
                       // sky. Only the lamp gets a halo, which is the one part
                       // real photographs show without fog.
+  wSteps:2,           // line-width buckets. Multiplies stroke count; see pass 3.
   bands:48,           // brightness levels. This is a BATCHING budget, not a look:
                       // each band is one beginPath/stroke for every segment in
                       // it, so the count trades draw calls against tonal
@@ -368,6 +369,7 @@ const SPEC=[
  ['gLook',[
   ['bright','brightness',.1,4,.05,2],
   ['bands','brightness levels',4,64,1,0],
+  ['wSteps','width buckets',1,6,1,0],
   ['dithAmt','dither',0,1.5,.05,2],
   ['dimFar','horizon brightness',.1,1,.02,2],
   ['glow','glow spread',1,10,.1,1],
@@ -1038,7 +1040,11 @@ function frame(now){
   // can share one path. lineWidth varies per line, so it becomes a third bucket
   // axis quantised into WSTEPS, and alpha folds into the band index because
   // `base` is per-line as well.
-  const BANDS=P.bands|0, WSTEPS=6;
+  // Width is a bucket axis, so it multiplies the stroke count directly: at 6
+  // steps a 41-band field costs 246 buckets rather than 41. The visible spread
+  // is about 1.5px of line width across the whole field, so 2 steps carries the
+  // near/far weight difference and the rest was paying 3x for nothing.
+  const BANDS=P.bands|0, WSTEPS=Math.max(1,P.wSteps|0);
   const NBUCK=BANDS*TINTS*WSTEPS;
   if(!DRAW.buf || DRAW.n!==NBUCK){
     DRAW.buf=[]; for(let q=0;q<NBUCK;q++)DRAW.buf.push([]); DRAW.n=NBUCK;
