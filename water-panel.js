@@ -1,5 +1,5 @@
-// Tuning panel for water.js. Loaded by rope-waves-sim.html always, and by the
-// live page only on #tune -- see index.html. Everything it needs from the
+// Tuning panel for water.js. Loaded by designs/rope-waves-sim.html always, and
+// by the live page only on #tune -- see index.html. Everything it needs from the
 // renderer comes through window.WATER; it reaches into nothing else.
 (function(){
 'use strict';
