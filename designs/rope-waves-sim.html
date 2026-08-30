@@ -241,6 +241,7 @@ const DEF={
   beamSoft:.55,       // fraction of the cone that is soft edge.
   beamLift:1.6,       // specular gain on crests facing the lamp.
   lampX:.42,          // lamp position across the screen, 0..1.
+  beamSat:0.72,      // amber saturation. 1 = full amber, 0 = neutral warm-white.
   beamWarm:1.0,       // how far lit water shifts toward amber. 0 = stays cool.
   copyClear:26,       // px of water-free margin kept under the masthead copy.
                       // Pushes the horizon down on short viewports rather than
@@ -361,6 +362,7 @@ const SPEC=[
   ['beamLift','crest glint',0,4,.05,2],
   ['lampX','lamp position',0,1,.01,2],
   ['beamWarm','beam warmth',0,1,.02,2],
+  ['beamSat','beam saturation',0,1,.02,2],
   ['beamHaze','lamp haze',0,1,.02,2],
   ['beamGuard','copy guard',0,1,.02,2],
   ['copyClear','copy clearance',0,120,2,0],
@@ -436,7 +438,7 @@ addEventListener('keydown',e=>{
 });
 
 // ---- draw -----------------------------------------------------------------
-const COOL=[143,182,217], AMBER=[240,169,76], TAU=Math.PI*2;
+const COOL=[143,182,217], AMBER=[236,196,150], TAU=Math.PI*2;
 // Warm-tint buckets: a segment's colour is COOL->AMBER by how much beam it
 // caught. Banding by alpha alone would force one colour per band, so the beam
 // gets its own axis and each band is drawn once per tint bucket it uses.
@@ -1123,9 +1125,12 @@ function frame(now){
         // Empty tint buckets cost nothing, so while the beam is off this is the
         // same number of strokes as before: every segment lands in bucket 0.
         const m=TINTS>1?ti/(TINTS-1):0;
-        const col=(COOL[0]+(AMBER[0]-COOL[0])*m|0)+','
-                 +(COOL[1]+(AMBER[1]-COOL[1])*m|0)+','
-                 +(COOL[2]+(AMBER[2]-COOL[2])*m|0);
+        let r=COOL[0]+(AMBER[0]-COOL[0])*m,
+            gg=COOL[1]+(AMBER[1]-COOL[1])*m,
+            bb=COOL[2]+(AMBER[2]-COOL[2])*m;
+        const sat=P.beamSat, lum=0.2126*r+0.7152*gg+0.0722*bb;
+        r=lum+(r-lum)*sat; gg=lum+(gg-lum)*sat; bb=lum+(bb-lum)*sat;
+        const col=(r|0)+','+(gg|0)+','+(bb|0);
         g.beginPath();
         for(let k2=0;k2<seg.length;k2+=2){g.moveTo(seg[k2][0],seg[k2][1]);g.lineTo(seg[k2+1][0],seg[k2+1][1]);}
         g.strokeStyle='rgba('+col+','+(al*0.20)+')';g.lineWidth=lw*P.glow;g.stroke();
