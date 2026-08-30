@@ -672,8 +672,22 @@ function simAt(fx,fy){
 function simAtBox(fx,fy,fw){
   if(fw<=1.2) return simAt(fx,fy);
   const n=Math.min(6,Math.max(2,Math.round(fw)));
+  // fx is the same for every sample in the box, so the x wrap and its two
+  // columns are hoisted out: simAt would redo four modulos per sample, and this
+  // runs up to 4x per point (three Gerstner iterations plus the final read).
+  const {W:w,H:hh,h}=SIM;
+  const x0=Math.floor(fx), tx=fx-x0;
+  const xa=((x0%w)+w)%w, xb=((x0+1)%w+w)%w;
+  const inv=1/(n-1);
   let a=0;
-  for(let q=0;q<n;q++) a+=simAt(fx,fy+(q/(n-1)-0.5)*fw);
+  for(let q=0;q<n;q++){
+    const fy2=fy+(q*inv-0.5)*fw;
+    let y0=Math.floor(fy2); const ty=fy2-y0;
+    y0=y0<0?0:(y0>hh-2?hh-2:y0);
+    const r0=y0*w, r1=r0+w;
+    a+=(h[r0+xa]*(1-tx)+h[r0+xb]*tx)*(1-ty)
+      +(h[r1+xa]*(1-tx)+h[r1+xb]*tx)*ty;
+  }
   return a/n;
 }
 
@@ -688,7 +702,19 @@ const GUARD={on:0, x0:0, x1:0, y1:0};
 // the beam state does, so they are rebuilt on a key rather than every frame.
 const GRAD={val:{}, key:{}};
 // Reused segment buckets for the draw pass, so a frame allocates nothing.
+// Buckets hold POINT INDICES into SCR.px/py, not [x,y] pairs: a pair per segment
+// meant ~40k two-element arrays per frame (266KB of garbage at 120 lines), and
+// the resulting GC pauses are exactly what a weaker machine feels as stutter.
 const DRAW={buf:null, n:0};
+// Per-frame scratch, grown as needed and never released. Same reason.
+const SCR={py:null, px:null, sl:null, sl2:null, by:null, cap:0, xcap:0};
+function scratch(np,M){
+  if(SCR.cap<np){
+    SCR.py=new Float64Array(np); SCR.sl=new Float32Array(np);
+    SCR.sl2=new Float32Array(np); SCR.by=new Float64Array(np); SCR.cap=np;
+  }
+  if(SCR.xcap<M){ SCR.px=new Float64Array(M); SCR.xcap=M; }
+}
 function grad(name,key,make){
   if(GRAD.key[name]!==key){ GRAD.key[name]=key; GRAD.val[name]=make(); }
   return GRAD.val[name];
@@ -873,7 +899,11 @@ function frame(now){
   // than no sea. quality falls until frames land in budget; see adaptQuality.
   const step=Math.max(1,P.ptStep*wScale*quality), M=Math.ceil((W+80)/step)+1;
   WATER.step=step; WATER.pts=M*N; WATER.quality=quality; WATER.glowFade=glowFade;
-  const PY_=new Float64Array(N*M);          // y of every point
+  scratch(N*M,M);
+  const PY_=SCR.py, PX_=SCR.px;
+  // x is shared by every line -- point j sits at the same x on all of them --
+  // so it is computed once here instead of N times inside the draw loop.
+  for(let j=0;j<M;j++) PX_[j]=-40+j*step;
   const baseY=new Float64Array(N), ampA=new Float64Array(N), nearA=new Float64Array(N);
   const kxA=new Float64Array(N);   // per-line wavenumber, needed by the foam test in pass 3
 
@@ -983,19 +1013,17 @@ function frame(now){
   for(let i=0;i<N;i++){
     const row=i*M, y0=baseY[i], amp=ampA[i], near=nearA[i], kxi=kxA[i];
 
-    const pts=[];
-    for(let j=0;j<M;j++) pts.push([-40+j*step, PY_[row+j]]);
+    // This line's y values live in PY_[row .. row+M-1]; x is shared in PX_.
 
     // Taubin smoothing along the line itself: each point slides toward the
     // midpoint of its two neighbours in x. Every shrinking pass (+lam) is
     // paired with an expanding one (-mu) so repeated passes do not flatten the
     // wave. Endpoints stay pinned so the line still spans the full width.
     if(P.smooth>0 && P.smoothPass>0){
-      const lam=0.6*P.smooth, mu=-0.63*P.smooth, n=pts.length;
-      const by=new Float64Array(n);
+      const lam=0.6*P.smooth, mu=-0.63*P.smooth, by=SCR.by;
       const relax=f=>{
-        for(let k2=0;k2<n;k2++) by[k2]=pts[k2][1];
-        for(let k2=1;k2<n-1;k2++) pts[k2][1]=by[k2]+f*((by[k2-1]+by[k2+1])*0.5-by[k2]);
+        for(let k2=0;k2<M;k2++) by[k2]=PY_[row+k2];
+        for(let k2=1;k2<M-1;k2++) PY_[row+k2]=by[k2]+f*((by[k2-1]+by[k2+1])*0.5-by[k2]);
       };
       for(let q=0;q<P.smoothPass;q++){relax(lam);relax(mu);}
     }
@@ -1032,23 +1060,23 @@ function frame(now){
     // line keeps its tonal range (which crest lacks: crest is hard-zero 54% of the
     // time) while removing the flicker. slopeSmooth is the tap count; 0 disables.
     const sm=P.slopeSmooth|0;
-    const rawSl=new Float32Array(pts.length), smSl=new Float32Array(pts.length);
-    for(let j=1;j<pts.length;j++)
-      rawSl[j]=Math.min(2.5,Math.abs(pts[j][1]-pts[j-1][1])/step*14);
+    const rawSl=SCR.sl, smSl=SCR.sl2;
+    for(let j=1;j<M;j++)
+      rawSl[j]=Math.min(2.5,Math.abs(PY_[row+j]-PY_[row+j-1])/step*14);
     if(sm>0){
-      for(let j=1;j<pts.length;j++){
+      for(let j=1;j<M;j++){
         let acc=0,n=0;
-        for(let d=-sm;d<=sm;d++){const k=j+d; if(k>=1&&k<pts.length){acc+=rawSl[k];n++;}}
+        for(let d=-sm;d<=sm;d++){const k=j+d; if(k>=1&&k<M){acc+=rawSl[k];n++;}}
         smSl[j]=acc/n;
       }
-    } else smSl.set(rawSl);
-    for(let j=1;j<pts.length;j++){
-      const a2=pts[j-1], b2=pts[j];
-      const crest=Math.max(0,(y0-a2[1])/(amp+.001));
+    } else smSl.set(rawSl.subarray(0,M),0);
+    for(let j=1;j<M;j++){
+      const ax=PX_[j-1], ay=PY_[row+j-1];
+      const crest=Math.max(0,(y0-ay)/(amp+.001));
       // |dy/dx| over the segment, low-passed along the line (see above).
       const slope=smSl[j];
       // scale-free: divides out this line's own amplitude and wavenumber
-      const nslope=Math.abs(b2[1]-a2[1])/step/(amp*kxi+1e-6);
+      const nslope=Math.abs(PY_[row+j]-ay)/step/(amp*kxi+1e-6);
       // Normalise the lighting into 0..1 before it becomes brightness.
       // The old form was base*(0.65 + lit*crest), and the constant 0.65 was a
       // floor so troughs never vanished -- but as a CONSTANT it ate 19 of the 64
@@ -1071,7 +1099,7 @@ function frame(now){
         const bd=1-near;
         // Elevation grows with the tower: a light on a mesa throws a longer,
         // narrower glare path than one sitting at sea level.
-        const bearing=Math.atan2((a2[0]-BEAM.lx)/W, BEAM.elev+bd*1.6);
+        const bearing=Math.atan2((ax-BEAM.lx)/W, BEAM.elev+bd*1.6);
         const d=Math.abs(bearing-BEAM.a);
         const hw=Math.max(.01,P.beamWidth);
         // Soft-edged wedge: full inside, falling to 0 across the outer `soft`.
@@ -1085,9 +1113,9 @@ function frame(now){
             // bottom edge, so the beam fades out under the text instead of
             // ending on a hard line that would read as a rectangle.
             const fx=90, fy=70;
-            const sx=a2[0]<GUARD.x0 ? (GUARD.x0-a2[0])/fx
-                   : a2[0]>GUARD.x1 ? (a2[0]-GUARD.x1)/fx : 0;
-            const sy=a2[1]>GUARD.y1 ? (a2[1]-GUARD.y1)/fy : 0;
+            const sx=ax<GUARD.x0 ? (GUARD.x0-ax)/fx
+                   : ax>GUARD.x1 ? (ax-GUARD.x1)/fx : 0;
+            const sy=ay>GUARD.y1 ? (ay-GUARD.y1)/fy : 0;
             const away=Math.min(1,Math.max(sx,sy));
             cone*=away+(1-away)*(1-P.beamGuard);
           }
@@ -1132,8 +1160,11 @@ function frame(now){
       const fb=aFinal/(0.33*P.bright*2.2)*BANDS + (dith[j&63]-0.5)*P.dithAmt;
       const bi=Math.max(0,Math.min(BANDS-1,fb|0));
       const ti=Math.min(TINTS-1,(hit*P.beamWarm*TINTS)|0);
-      bucket[(bi*TINTS+ti)*WSTEPS+wi].push(a2,b2);
-      if(P.foam>0 && nslope>P.foamAt) foamAll.push(a2,b2);
+      // One number per segment: the index of its first point in PY_. The
+      // second point is always the next one along the same line, so the draw
+      // pass reconstructs both ends without storing them.
+      bucket[(bi*TINTS+ti)*WSTEPS+wi].push(row+j-1);
+      if(P.foam>0 && nslope>P.foamAt) foamAll.push(row+j-1);
     }
 
   }
@@ -1156,7 +1187,8 @@ function frame(now){
         if(!seg.length)continue;
         const lw=lwLo+lwSpan*(wq+0.5)/WSTEPS;
         g.beginPath();
-        for(let k2=0;k2<seg.length;k2+=2){g.moveTo(seg[k2][0],seg[k2][1]);g.lineTo(seg[k2+1][0],seg[k2+1][1]);}
+        for(let k2=0;k2<seg.length;k2++){const p0=seg[k2];
+          g.moveTo(PX_[p0%M],PY_[p0]);g.lineTo(PX_[(p0+1)%M],PY_[p0+1]);}
         // The glow is a second stroke of every segment at P.glow x the width, so
         // it costs several times the fill of the line itself. On a fill-limited
         // machine that is the single biggest thing to give up, and it fades out
@@ -1173,7 +1205,8 @@ function frame(now){
   // Foam sits on top, whiter and tighter than the water beneath it.
   if(foamAll.length){
     g.beginPath();
-    for(let k2=0;k2<foamAll.length;k2+=2){g.moveTo(foamAll[k2][0],foamAll[k2][1]);g.lineTo(foamAll[k2+1][0],foamAll[k2+1][1]);}
+    for(let k2=0;k2<foamAll.length;k2++){const p0=foamAll[k2];
+      g.moveTo(PX_[p0%M],PY_[p0]);g.lineTo(PX_[(p0+1)%M],PY_[p0+1]);}
     g.strokeStyle='rgba(226,240,255,'+Math.min(1,0.33*P.bright*2.2*P.foam).toFixed(4)+')';
     g.lineWidth=(lwLo+lwSpan*0.75)*1.5; g.stroke();
   }
