@@ -803,6 +803,13 @@ function simAtBox(fx,fy,fw){
 // the sides); BEAM.on is 0 while dark.
 const BEAM={next:4, until:0, dir:1, left:0, on:0, a:0, lx:0, elev:.12};
 const GUARD={on:0, x0:0, x1:0, y1:0};
+// Gradient objects are expensive to build and only change when the geometry or
+// the beam state does, so they are rebuilt on a key rather than every frame.
+const GRAD={val:{}, key:{}};
+function grad(name,key,make){
+  if(GRAD.key[name]!==key){ GRAD.key[name]=key; GRAD.val[name]=make(); }
+  return GRAD.val[name];
+}
 function beamStep(t){
   if(P.beam<=0){BEAM.on=0;return;}
   if(t>=BEAM.next && BEAM.left<=0){
@@ -882,8 +889,9 @@ function frame(now){
   BEAM.elev=0.12+(CLIFF.on?(P.cliffH+P.towerH)*1.1:0);
 
   g.fillStyle='#070A10';g.fillRect(0,0,W,H);
-  const sky=g.createLinearGradient(0,0,0,hz);
-  sky.addColorStop(0,'#080C14');sky.addColorStop(1,'#0E1620');
+  const sky=grad('sky',hz,()=>{
+    const q=g.createLinearGradient(0,0,0,hz);
+    q.addColorStop(0,'#080C14');q.addColorStop(1,'#0E1620');return q;});
   g.fillStyle=sky;g.fillRect(0,0,W,hz);
   if(P.beam>0 && P.beamHaze>0){
     // Only a halo at the source -- no shaft. In clear air the beam is invisible
@@ -892,16 +900,18 @@ function frame(now){
     // cartoons. Brightens while sweeping, never fully dark.
     const pulse=0.30+0.70*(BEAM.on?1:0);
     const rr=Math.max(8,W*0.075*P.beamHaze);
-    const gl=g.createRadialGradient(lampX,lampY,0,lampX,lampY,rr);
-    gl.addColorStop(0,'rgba(240,169,76,'+(0.34*pulse*P.beamHaze).toFixed(3)+')');
-    gl.addColorStop(.45,'rgba(240,169,76,'+(0.10*pulse*P.beamHaze).toFixed(3)+')');
-    gl.addColorStop(1,'rgba(240,169,76,0)');
+    const gl=grad('halo',lampX+'|'+lampY+'|'+rr+'|'+pulse+'|'+P.beamHaze,()=>{
+      const q=g.createRadialGradient(lampX,lampY,0,lampX,lampY,rr);
+      q.addColorStop(0,'rgba(240,169,76,'+(0.34*pulse*P.beamHaze).toFixed(3)+')');
+      q.addColorStop(.45,'rgba(240,169,76,'+(0.10*pulse*P.beamHaze).toFixed(3)+')');
+      q.addColorStop(1,'rgba(240,169,76,0)');return q;});
     g.fillStyle=gl;g.fillRect(lampX-rr,lampY-rr,rr*2,rr*2);
     g.fillStyle='rgba(255,214,150,'+(0.55*pulse).toFixed(3)+')';
     g.beginPath();g.arc(lampX,lampY,Math.max(1,W*0.0022),0,TAU);g.fill();
   }
-  const sea=g.createLinearGradient(0,hz,0,H);
-  sea.addColorStop(0,'#0A121C');sea.addColorStop(1,'#070A10');
+  const sea=grad('sea',hz+'|'+H,()=>{
+    const q=g.createLinearGradient(0,hz,0,H);
+    q.addColorStop(0,'#0A121C');q.addColorStop(1,'#070A10');return q;});
   g.fillStyle=sea;g.fillRect(0,hz,W,H-hz);
 
   g.globalCompositeOperation='lighter';
@@ -1245,10 +1255,11 @@ function frame(now){
 
     // A faint lit rim on the seaward edge, brightening while the lamp sweeps.
     g.save();g.clip();
-    const rim=g.createLinearGradient(x0,top,x0+(W-x0)*0.5,base);
     const ri=(0.05+0.09*(BEAM.on?1:0)).toFixed(3);
-    rim.addColorStop(0,'rgba(236,196,150,'+ri+')');
-    rim.addColorStop(1,'rgba(236,196,150,0)');
+    const rim=grad('rim',x0+'|'+top+'|'+base+'|'+ri,()=>{
+      const q=g.createLinearGradient(x0,top,x0+(W-x0)*0.5,base);
+      q.addColorStop(0,'rgba(236,196,150,'+ri+')');
+      q.addColorStop(1,'rgba(236,196,150,0)');return q;});
     g.fillStyle=rim;g.fillRect(x0,top-20,W-x0,base-top+20);
     g.restore();
 
