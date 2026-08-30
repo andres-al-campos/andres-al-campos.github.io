@@ -806,6 +806,8 @@ const GUARD={on:0, x0:0, x1:0, y1:0};
 // Gradient objects are expensive to build and only change when the geometry or
 // the beam state does, so they are rebuilt on a key rather than every frame.
 const GRAD={val:{}, key:{}};
+// Reused segment buckets for the draw pass, so a frame allocates nothing.
+const DRAW={buf:null, n:0};
 function grad(name,key,make){
   if(GRAD.key[name]!==key){ GRAD.key[name]=key; GRAD.val[name]=make(); }
   return GRAD.val[name];
@@ -1028,6 +1030,23 @@ function frame(now){
   }
 
   // ---- pass 3: draw ------------------------------------------------------
+  // Buckets are GLOBAL, not per line. They used to be allocated inside this
+  // loop, so the batching only ever grouped a single line's segments: 120 lines
+  // x ~8 occupied bands x 2 strokes came to ~1980 stroke() calls per frame
+  // rather than the few hundred the banding exists to achieve. Compositing is
+  // 'lighter' and therefore order-independent, so segments from different lines
+  // can share one path. lineWidth varies per line, so it becomes a third bucket
+  // axis quantised into WSTEPS, and alpha folds into the band index because
+  // `base` is per-line as well.
+  const BANDS=P.bands|0, WSTEPS=6;
+  const NBUCK=BANDS*TINTS*WSTEPS;
+  if(!DRAW.buf || DRAW.n!==NBUCK){
+    DRAW.buf=[]; for(let q=0;q<NBUCK;q++)DRAW.buf.push([]); DRAW.n=NBUCK;
+  } else {
+    for(let q=0;q<NBUCK;q++) if(DRAW.buf[q].length) DRAW.buf[q].length=0;
+  }
+  const bucket=DRAW.buf, foamAll=[];
+  const lwLo=0.5*P.width, lwHi=2.0*P.width, lwSpan=Math.max(1e-6,lwHi-lwLo);
   for(let i=0;i<N;i++){
     const row=i*M, y0=baseY[i], amp=ampA[i], near=nearA[i], kxi=kxA[i];
 
@@ -1057,7 +1076,8 @@ function frame(now){
     // of near brightness the horizon keeps: 1 = no ramp at all.
     const dim=P.dimFar+(1-P.dimFar)*near;
     const base=0.33*dim*P.bright;
-    const foam=[];
+    const lwLine=(0.5+near*1.5)*P.width;
+    const wi=Math.max(0,Math.min(WSTEPS-1,((lwLine-lwLo)/lwSpan*WSTEPS)|0));
     // Alpha bands. Every segment in a band is stroked at ONE alpha, so this is
     // literally colour quantization and the band count is the bit depth: at 6
     // the whole surface had only 6 possible brightnesses, a mean error of 24%
@@ -1070,8 +1090,6 @@ function frame(now){
     // bands is the cheap way out: 32 puts the step at ~3% of range, under what
     // the eye picks up on a smooth gradient, for 5x the path ops on a frame
     // that was running at twice its target.
-    const BANDS=P.bands|0, bands=[];
-    for(let b=0;b<BANDS*TINTS;b++)bands.push([]);
     // Slope is a finite difference between ADJACENT samples, so it is inherently
     // high-frequency: every bit of grid noise lands in it at full strength. Measured
     // along real lines, lighting from slope alone reverses direction sample-to-sample
@@ -1175,41 +1193,49 @@ function frame(now){
       // contours without the noise reading as grain.
       // Band straight off the normalised shade: the whole 0..BANDS range is
       // reachable now, instead of the 25% the old al/(base*2.2) mapping allowed.
-      const fb=(P.floor+(1-P.floor)*shade)*BANDS + (dith[j&63]-0.5)*P.dithAmt;
+      // Final alpha, not per-line shade: `base` carries the depth fade, so it
+      // has to be inside the quantisation for a global bucket to be one colour.
+      const aFinal=base*2.2*(P.floor+(1-P.floor)*shade);
+      const fb=aFinal/(0.33*P.bright*2.2)*BANDS + (dith[j&63]-0.5)*P.dithAmt;
       const bi=Math.max(0,Math.min(BANDS-1,fb|0));
       const ti=Math.min(TINTS-1,(hit*P.beamWarm*TINTS)|0);
-      bands[bi*TINTS+ti].push(a2,b2);
-      if(P.foam>0 && nslope>P.foamAt) foam.push(a2,b2);
+      bucket[(bi*TINTS+ti)*WSTEPS+wi].push(a2,b2);
+      if(P.foam>0 && nslope>P.foamAt) foamAll.push(a2,b2);
     }
 
-    const lw=(0.5+near*1.5)*P.width;
-    for(let b=0;b<BANDS;b++){
-      const al=base*2.2*(b+0.5)/BANDS;
-      for(let ti=0;ti<TINTS;ti++){
-        const seg=bands[b*TINTS+ti];if(!seg.length)continue;
-        // Empty tint buckets cost nothing, so while the beam is off this is the
-        // same number of strokes as before: every segment lands in bucket 0.
-        const m=TINTS>1?ti/(TINTS-1):0;
-        let r=COOL[0]+(AMBER[0]-COOL[0])*m,
-            gg=COOL[1]+(AMBER[1]-COOL[1])*m,
-            bb=COOL[2]+(AMBER[2]-COOL[2])*m;
-        const sat=P.beamSat, lum=0.2126*r+0.7152*gg+0.0722*bb;
-        r=lum+(r-lum)*sat; gg=lum+(gg-lum)*sat; bb=lum+(bb-lum)*sat;
-        const col=(r|0)+','+(gg|0)+','+(bb|0);
+  }
+
+  // One flush for the whole field. Empty buckets cost nothing, so the stroke
+  // count is the number of (alpha, tint, width) combinations actually present.
+  const maxA=0.33*P.bright*2.2;
+  for(let b=0;b<BANDS;b++){
+    const al=maxA*(b+0.5)/BANDS;
+    for(let ti=0;ti<TINTS;ti++){
+      const m=TINTS>1?ti/(TINTS-1):0;
+      let r=COOL[0]+(AMBER[0]-COOL[0])*m,
+          gg=COOL[1]+(AMBER[1]-COOL[1])*m,
+          bb=COOL[2]+(AMBER[2]-COOL[2])*m;
+      const sat=P.beamSat, lum=0.2126*r+0.7152*gg+0.0722*bb;
+      r=lum+(r-lum)*sat; gg=lum+(gg-lum)*sat; bb=lum+(bb-lum)*sat;
+      const col=(r|0)+','+(gg|0)+','+(bb|0);
+      for(let wq=0;wq<WSTEPS;wq++){
+        const seg=bucket[(b*TINTS+ti)*WSTEPS+wq];
+        if(!seg.length)continue;
+        const lw=lwLo+lwSpan*(wq+0.5)/WSTEPS;
         g.beginPath();
         for(let k2=0;k2<seg.length;k2+=2){g.moveTo(seg[k2][0],seg[k2][1]);g.lineTo(seg[k2+1][0],seg[k2+1][1]);}
-        g.strokeStyle='rgba('+col+','+(al*0.20)+')';g.lineWidth=lw*P.glow;g.stroke();
-        g.strokeStyle='rgba('+col+','+Math.min(1,al)+')';g.lineWidth=lw;g.stroke();
+        g.strokeStyle='rgba('+col+','+(al*0.20).toFixed(4)+')';g.lineWidth=lw*P.glow;g.stroke();
+        g.strokeStyle='rgba('+col+','+Math.min(1,al).toFixed(4)+')';g.lineWidth=lw;g.stroke();
       }
     }
+  }
 
-    // Foam sits on top, whiter and tighter than the water beneath it.
-    if(foam.length){
-      g.beginPath();
-      for(let k2=0;k2<foam.length;k2+=2){g.moveTo(foam[k2][0],foam[k2][1]);g.lineTo(foam[k2+1][0],foam[k2+1][1]);}
-      g.strokeStyle='rgba(226,240,255,'+Math.min(1,base*2.2*P.foam)+')';
-      g.lineWidth=lw*1.5; g.stroke();
-    }
+  // Foam sits on top, whiter and tighter than the water beneath it.
+  if(foamAll.length){
+    g.beginPath();
+    for(let k2=0;k2<foamAll.length;k2+=2){g.moveTo(foamAll[k2][0],foamAll[k2][1]);g.lineTo(foamAll[k2+1][0],foamAll[k2+1][1]);}
+    g.strokeStyle='rgba(226,240,255,'+Math.min(1,0.33*P.bright*2.2*P.foam).toFixed(4)+')';
+    g.lineWidth=(lwLo+lwSpan*0.75)*1.5; g.stroke();
   }
   g.globalCompositeOperation='source-over';
 
