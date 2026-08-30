@@ -242,6 +242,15 @@ const DEF={
   beamLift:1.6,       // specular gain on crests facing the lamp.
   lampX:.42,          // lamp position across the screen, 0..1.
   beamWarm:1.0,       // how far lit water shifts toward amber. 0 = stays cool.
+  copyClear:26,       // px of water-free margin kept under the masthead copy.
+                      // Pushes the horizon down on short viewports rather than
+                      // letting waves run under the text. 0 disables.
+  beamGuard:1.0,      // how strongly the beam is held back behind the masthead
+                      // copy. Measured: at viewport heights under ~591px the
+                      // horizon rises past the copy, and an amber wash under the
+                      // intro paragraph took contrast to 1.0 (text and water the
+                      // same colour -- literally invisible) against WCAG AA's
+                      // 4.5 for body text. 0 disables the guard.
   beamHaze:.35,       // glow bloom around the lamp itself. In CLEAR air a beam
                       // is invisible from the side -- you only see where it
                       // LANDS -- so there is deliberately no cone drawn in the
@@ -353,6 +362,8 @@ const SPEC=[
   ['lampX','lamp position',0,1,.01,2],
   ['beamWarm','beam warmth',0,1,.02,2],
   ['beamHaze','lamp haze',0,1,.02,2],
+  ['beamGuard','copy guard',0,1,.02,2],
+  ['copyClear','copy clearance',0,120,2,0],
   ['crest','crest contrast',0,2,.05,2],
   ['slopeLit','light on slopes',0,1,.02,2],
   ['slopeSmooth','slope smoothing',0,8,1,0],
@@ -753,6 +764,7 @@ function simAtBox(fx,fy,fw){
 // beam bearing in radians (0 = pointing straight at the viewer, +/- = off to
 // the sides); BEAM.on is 0 while dark.
 const BEAM={next:4, until:0, dir:1, left:0, on:0, a:0};
+const GUARD={on:0, x0:0, x1:0, y1:0};
 function beamStep(t){
   if(P.beam<=0){BEAM.on=0;return;}
   if(t>=BEAM.next && BEAM.left<=0){
@@ -787,10 +799,32 @@ function frame(now){
   if(!paused) t+=dt;
   beamStep(t);
 
-  const hz=H*P.horizon, N=P.lines|0;
+  // Horizon, floored below the masthead copy. Measured at 1100x560: the copy
+  // bottom (201px) sits past a 0.34*H horizon (190px) and the white wave lines
+  // run straight under the intro paragraph -- contrast 3.14 average and 1.0
+  // worst case, i.e. text pixels the same colour as the water. That is the
+  // water itself, not the beam: with the beam off it was still 3.14, and with
+  // the water off it was 7.37. Below about 591px of viewport height the layout
+  // simply has no room, so the horizon yields instead of the text.
+  let hz=H*P.horizon;
+  if(P.copyClear>0){
+    const ce=document.querySelector('.copy');
+    if(ce){const cb=ce.getBoundingClientRect().bottom+P.copyClear;
+      if(cb>hz) hz=Math.min(H*0.82,cb);}
+  }
+  const N=P.lines|0;
   // Where the lamp sits on screen: a fixed point on the horizon, off to one
   // side. The beam sweeps from here, so the glare path converges on it.
   const lampX=W*P.lampX, lampY=hz-2;
+  // Masthead guard box, in CSS px, refreshed each frame so it tracks layout.
+  // Read from the DOM rather than hardcoded: the copy is clamp()-positioned and
+  // its height changes with wrapping, so a fixed rect would drift.
+  if(P.beamGuard>0){
+    const ce=document.querySelector('.copy');
+    if(ce){const r=ce.getBoundingClientRect();
+      GUARD.on=1; GUARD.x0=r.left; GUARD.x1=r.right; GUARD.y1=r.bottom;
+    } else GUARD.on=0;
+  } else GUARD.on=0;
 
   g.fillStyle='#070A10';g.fillRect(0,0,W,H);
   const sky=g.createLinearGradient(0,0,0,hz);
@@ -1024,9 +1058,22 @@ function frame(now){
         const hw=Math.max(.01,P.beamWidth);
         // Soft-edged wedge: full inside, falling to 0 across the outer `soft`.
         const inner=hw*(1-P.beamSoft);
-        const cone=d<=inner ? 1
+        let cone=d<=inner ? 1
                  : d>=hw ? 0
                  : 1-(d-inner)/Math.max(1e-4,hw-inner);
+        if(cone>0){
+          if(GUARD.on){
+            // Feather over `fx` px horizontally and `fy` px above the box's
+            // bottom edge, so the beam fades out under the text instead of
+            // ending on a hard line that would read as a rectangle.
+            const fx=90, fy=70;
+            const sx=a2[0]<GUARD.x0 ? (GUARD.x0-a2[0])/fx
+                   : a2[0]>GUARD.x1 ? (a2[0]-GUARD.x1)/fx : 0;
+            const sy=a2[1]>GUARD.y1 ? (a2[1]-GUARD.y1)/fy : 0;
+            const away=Math.min(1,Math.max(sx,sy));
+            cone*=away+(1-away)*(1-P.beamGuard);
+          }
+        }
         if(cone>0){
           hit=cone*cone;
           // Specular: faces tilted toward the lamp bounce it at the viewer.
