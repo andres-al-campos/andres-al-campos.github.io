@@ -82,7 +82,9 @@ body {
   line-height: 1.12;
   letter-spacing: -.032em;
   font-weight: 600;
-  max-width: 19ch;
+  /* 19ch held the old two-line headline. This one is longer and broke into three
+     ragged lines at that width; 25ch lets balance find an even two-line split. */
+  max-width: 25ch;
   text-wrap: balance;
 }
 
