@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Alex Campos — tools that take the friction out</title>
-<meta name="description" content="Browser extensions, menu bar apps, iPhone apps, and analysis pipelines. Each one started as something that annoyed me often enough to be worth a weekend, or a year.">
-<link rel="stylesheet" href="style.css?v=2">
+<title>Alex Campos — tools that find what was already there</title>
+<meta name="description" content="Six small tools that make something visible that was already true: honest ratings, where your hours went, the shape of a problem too big to hold in your head.">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 
@@ -15,11 +15,11 @@
   <canvas id="scene" aria-hidden="true"></canvas>
 <header class="masthead">
   <p class="who">Alex Campos</p>
-  <h1>Tools that take the <span class="lit">friction out</span>.</h1>
+  <h1>Tools that find what was <span class="lit">already there</span>.</h1>
   <p class="intro">
-    Browser extensions, menu bar apps, iPhone apps, and analysis pipelines. Each one
-    started as something that annoyed me often enough to be worth a weekend, or a year.
-    They all run on my own machine.
+    The honest rating under the padded one. Where the hours actually went. The shape
+    of a problem too big to hold in your head. None of these invent anything — they
+    make something visible that was already true. They all run on my own machine.
   </p>
   <p class="links">
     <a href="https://github.com/andres-al-campos">GitHub</a>
@@ -29,9 +29,10 @@
 </div>
 
 <main>
-  <nav class="filters" id="filters" aria-label="Filter projects by platform"><span class="pill" id="pill"></span></nav>
-  <div id="groups"></div>
-  <p class="empty" id="empty" hidden>Nothing here yet.</p>
+  <div class="grid" id="grid"></div>
+  <p class="more">
+    These are six of them. The rest are on <a href="https://github.com/andres-al-campos">GitHub</a>.
+  </p>
 </main>
 
 <footer>
@@ -43,19 +44,7 @@
 <script src="projects.js"></script>
 <script>
 (function () {
-  var groupsEl = document.getElementById('groups');
-  var filters = document.getElementById('filters');
-  var pill = document.getElementById('pill');
-  var empty = document.getElementById('empty');
-
-  var ORDER = ['browser', 'tools', 'macos', 'ios'];
-  var LABELS = {
-    all: 'All',
-    browser: 'Browser',
-    tools: 'Tools',
-    macos: 'macOS',
-    ios: 'iPhone'
-  };
+  var grid = document.getElementById('grid');
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
@@ -64,7 +53,7 @@
     return n;
   }
 
-  function row(p) {
+  function card(p) {
     var a = el('a', 'row');
     a.href = p.repo;
     a.rel = 'noopener';
@@ -80,7 +69,7 @@
     htext.appendChild(el('p', 'tagline', p.tagline));
     head.appendChild(htext);
 
-    head.appendChild(el('span', 'arrow', '↗'));
+    head.appendChild(el('span', 'arrow', '\u2197'));
     a.appendChild(head);
 
     a.appendChild(el('p', 'blurb', p.blurb));
@@ -92,69 +81,7 @@
     return a;
   }
 
-  function render(platform) {
-    groupsEl.textContent = '';
-    var keys = platform === 'all' ? ORDER : [platform];
-    var shown = 0;
-
-    keys.forEach(function (k) {
-      var items = PROJECTS.filter(function (p) { return p.platform === k; });
-      if (!items.length) return;
-      shown += items.length;
-
-      var g = el('section', 'group');
-      g.appendChild(el('div', 'glabel', LABELS[k]));
-      var list = el('div', 'rows');
-      items.forEach(function (p) { list.appendChild(row(p)); });
-      g.appendChild(list);
-      groupsEl.appendChild(g);
-    });
-
-    empty.hidden = shown > 0;
-  }
-
-  function movePill(btn) {
-    // offsetLeft is from the container's border box, but the absolutely-positioned
-    // pill sits against the padding box — subtract the padding so they line up.
-    pill.style.width = btn.offsetWidth + 'px';
-    pill.style.transform = 'translateX(' + (btn.offsetLeft - 7) + 'px)';
-  }
-
-  // Build the filter row from the platforms actually present, in a fixed order.
-  var present = ORDER.filter(function (k) {
-    return PROJECTS.some(function (p) { return p.platform === k; });
-  });
-
-  var buttons = [];
-  ['all'].concat(present).forEach(function (key, i) {
-    var b = el('button', null, LABELS[key]);
-    b.type = 'button';
-    b.dataset.platform = key;
-    if (i === 0) b.setAttribute('aria-current', 'true');
-    b.addEventListener('click', function () {
-      buttons.forEach(function (o) { o.removeAttribute('aria-current'); });
-      b.setAttribute('aria-current', 'true');
-      movePill(b);
-      render(key);
-    });
-    filters.appendChild(b);
-    buttons.push(b);
-  });
-
-  render('all');
-  // Wait a frame so the buttons have laid out and offsetWidth is real. The first
-  // placement is not a selection change, so suppress the slide transition for it —
-  // otherwise the pill visibly travels in from the left on page load.
-  requestAnimationFrame(function () {
-    pill.style.transition = 'none';
-    movePill(buttons[0]);
-    requestAnimationFrame(function () { pill.style.transition = ''; });
-  });
-
-  window.addEventListener('resize', function () {
-    var cur = filters.querySelector('[aria-current="true"]');
-    if (cur) movePill(cur);
-  });
+  PROJECTS.forEach(function (p) { grid.appendChild(card(p)); });
 })();
 </script>
 

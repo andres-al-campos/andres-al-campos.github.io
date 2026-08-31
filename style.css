@@ -60,7 +60,12 @@ body {
 
 /* ---- masthead ---- */
 
-.masthead { padding: clamp(80px, 16vw, 170px) 0 clamp(40px, 6vw, 66px); }
+/* Top padding is deliberately short of what a centred block would take. The
+   horizon is not free to move: water.js clamps it below the copy (copyClear),
+   so the sea follows the text down and the two cannot be spaced apart from
+   here. Lifting the copy is what buys sea, and at 170px the sky above it was
+   dead space paid for twice. */
+.masthead { padding: clamp(56px, 9vw, 104px) 0 clamp(40px, 6vw, 66px); }
 
 .who {
   margin: 0 0 14px;
@@ -124,81 +129,28 @@ body {
 
 /* ---- filter pill ---- */
 
-.filters {
-  position: sticky;
-  top: 16px;
-  z-index: 5;
-  display: inline-flex;
-  gap: 2px;
-  padding: 7px;
-  margin: 0 0 clamp(28px, 4vw, 44px);
-  background: var(--pill-bg);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  backdrop-filter: blur(18px) saturate(150%);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .28), 0 10px 34px rgba(0, 0, 0, .18);
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
+/* ---- grid ---- */
+
+/* Three across, two down. Cards are equal-height so the row reads as a row;
+   the blurb varies in length, so without this the bottoms stagger. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(14px, 1.8vw, 20px);
+  align-items: stretch;
 }
 
-.filters::-webkit-scrollbar { display: none; }
+@media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 620px) { .grid { grid-template-columns: 1fr; } }
 
-.filters button {
-  position: relative;
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
-  padding: 8px 17px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--soft);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: color .2s;
-  z-index: 1;
-}
-
-.filters button:hover { color: var(--ink); }
-.filters button[aria-current="true"] { color: var(--bg); }
-.filters button:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
-
-/* The lit pill slides between buttons instead of each button toggling its own
-   background, so the selection reads as one object moving. */
-.pill {
-  position: absolute;
-  top: 7px;
-  height: calc(100% - 14px);
-  border-radius: 999px;
-  background: var(--amber);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--amber) 55%, transparent),
-              0 0 30px color-mix(in srgb, var(--amber) 30%, transparent);
-  transition: transform .38s cubic-bezier(.32, .72, .26, 1), width .38s cubic-bezier(.32, .72, .26, 1);
-  z-index: 0;
-  pointer-events: none;
-}
-
-/* ---- groups ---- */
-
-.group { margin: 0 0 clamp(34px, 5vw, 54px); scroll-margin-top: 80px; }
-
-.group .rows { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
-
-.glabel {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 11.5px;
-  letter-spacing: .16em;
-  text-transform: uppercase;
+.more {
+  margin: clamp(28px, 4vw, 44px) 0 0;
+  font-size: 14.5px;
   color: var(--faint);
-  font-weight: 600;
-  margin: 0 0 4px;
 }
 
-.glabel::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.more a { color: var(--amber); text-decoration: none; border-bottom: 1px solid transparent; }
+.more a:hover { border-bottom-color: currentColor; }
 
 /* ---- rows ---- */
 
@@ -206,7 +158,11 @@ body {
    says "clickable" before anyone reads a word, and it's the only one that
    survives on touch, where there is no hover. */
 .row {
-  display: block;
+  /* Column, not block: the grid stretches every card to the tallest in its row,
+     and the tag list is pushed to the bottom so the chips line up across the
+     row instead of floating wherever the blurb happens to end. */
+  display: flex;
+  flex-direction: column;
   text-decoration: none;
   color: inherit;
   position: relative;
@@ -311,8 +267,10 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin: 14px 0 0;
-  padding: 0;
+  /* auto, not a fixed top margin: it takes up the slack in a stretched card so
+     the chip rows align across the grid regardless of blurb length. */
+  margin: auto 0 0;
+  padding: 14px 0 0;
 }
 
 .tags li {
@@ -331,7 +289,6 @@ body {
   color: var(--soft);
 }
 
-.empty { color: var(--faint); padding: 40px 0; }
 
 /* ---- footer ---- */
 
