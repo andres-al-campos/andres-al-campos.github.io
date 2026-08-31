@@ -156,11 +156,34 @@ const P={
   // the one thing that actually hurts readability here. This holds it back.
   beamGuard:1.0,      // 0 = no guard, 1 = beam fully suppressed behind the copy
 };
-// The values as written in this file, captured before loadPanel() layers a saved
-// blob on top. 'reset to file' returns here; 'save as default' writes the current
-// P over this, so a later reset returns to what you saved rather than to what I
-// last typed.
+// The values as written in this file, captured BEFORE any saved blob is layered
+// on top. 'reset to file' returns here; 'save as default' writes the current P
+// over the stored copy, so a later reset returns to what you saved rather than
+// to what I last typed.
 const FILE_DEF={...P};
+
+// Saved tuning is applied here, not in water-panel.js: the panel only loads once
+// someone finds the easter egg, which is long after the first paint and after
+// the geometry has been built from these numbers. Reading it there meant saved
+// defaults silently did nothing until you opened the panel.
+//
+// Only keys already present in P are copied, and only finite numbers -- the blob
+// is whatever an older version of the panel happened to write, and a stale or
+// hand-edited key should not be able to introduce a param the renderer has no
+// meaning for.
+(function loadSaved(){
+  let raw=null;
+  try{ raw=localStorage.getItem('water.defaults'); }catch(e){ return; }
+  if(!raw) return;
+  let blob;
+  try{ blob=JSON.parse(raw); }catch(e){ return; }
+  if(!blob || typeof blob!=='object') return;
+  for(const k in blob){
+    if(!Object.prototype.hasOwnProperty.call(P,k)) continue;
+    const v=blob[k];
+    if(typeof v==='number' && isFinite(v)) P[k]=v;
+  }
+})();
 const TAU=Math.PI*2;
 
 let W=0,H=0,DPR=1;
