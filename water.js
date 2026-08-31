@@ -92,7 +92,13 @@ const P={
   // widthNear was 1.5, giving far lines 0.5x and near ones 2.0x -- a 4:1 spread
   // that made the foreground read as a different drawing from the background.
   // Depth is carried by dimFar and the shading; width barely needs to help.
-  width:1.25, widthNear:.45, dimFar:.30, bright:1.55,
+  // Width and brightness trade against each other under additive blending. At
+  // width 1.25 / bright 1.55 a line reached full white inside a single pixel --
+  // the fragment stage computed its edge ramp and the blend then clipped it flat,
+  // which is a hard edge no amount of antialiasing can fix. Measured off the
+  // drawing buffer, that profile was "44 255 40": background, saturated, back.
+  // Spreading the same light over a wider line leaves room for the ramp to land.
+  width:2.2, widthNear:.45, dimFar:.30, bright:.95,
 
   // --- stage 3: shading -----------------------------------------------------
   // Height-based lighting glows AT the crest, which reads as a glowing ridge.
