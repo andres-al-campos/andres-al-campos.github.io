@@ -30,8 +30,8 @@
 
 <main>
   <div class="grid" id="grid"></div>
-  <p class="more">
-    These are six of them. The rest are on <a href="https://github.com/andres-al-campos">GitHub</a>.
+  <p class="more" id="more">
+    These are six of them. <span id="morecount">The rest are</span> on <a href="https://github.com/andres-al-campos">GitHub</a>.
   </p>
 </main>
 
@@ -82,6 +82,52 @@
   }
 
   PROJECTS.forEach(function (p) { grid.appendChild(card(p)); });
+
+  // Repo count on the "rest are on GitHub" line.
+  //
+  // The markup ships with the countless wording, so the sentence is already
+  // correct before this runs and stays correct if it never succeeds. Nothing
+  // here has a failure branch that needs handling -- not filling the number in
+  // IS the fallback.
+  //
+  // Cached for a day because the unauthenticated API allows 60 requests per hour
+  // per IP, not per visitor. On a shared address -- an office, a campus, a mobile
+  // carrier -- enough readers in one hour would exhaust that and everyone after
+  // them would get nothing. A repo count moves a few times a year, so a day-old
+  // number is no worse than a fresh one.
+  var USER = 'andres-al-campos';
+  var KEY = 'gh.repos';
+  var DAY = 864e5;
+
+  function show(n) {
+    if (!(n > 0)) return;
+    var el = document.getElementById('morecount');
+    if (el) el.textContent = 'See all ' + n;
+  }
+
+  function cached() {
+    try {
+      var v = JSON.parse(localStorage.getItem(KEY));
+      if (v && Date.now() - v.at < DAY) return v.n;
+    } catch (e) {}
+    return null;
+  }
+
+  var hit = cached();
+  if (hit) {
+    show(hit);
+  } else {
+    fetch('https://api.github.com/users/' + USER)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d || typeof d.public_repos !== 'number') return;
+        show(d.public_repos);
+        try {
+          localStorage.setItem(KEY, JSON.stringify({ n: d.public_repos, at: Date.now() }));
+        } catch (e) {}
+      })
+      .catch(function () {});
+  }
 })();
 </script>
 
