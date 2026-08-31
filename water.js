@@ -125,29 +125,29 @@ const P={
                       // lighter band behind it the headland has nothing to read
                       // against and simply vanishes.
   cliff:1,            // draw the headland. 0 = open water, lamp sits on the horizon
-  cliffX:.80,         // where the cliff face meets the horizon, 0..1
+  cliffX:.70,         // where the cliff face meets the horizon, 0..1
   cliffH:.085,        // mesa top above the horizon, as a fraction of height
   cliffRough:.55,     // how broken the face and top edge are. 0 = clean
-  towerH:.055,        // tower height above the mesa, fraction of height
-  towerW:.0125,       // tower width, fraction of screen width
+  towerH:.075,        // tower height above the mesa, fraction of height
+  towerW:.0155,       // tower width, fraction of screen width
   // The headland is the nearest solid thing in frame, and at night the sky is
   // lighter than the land under it, not darker. Pure black rock on a near-black
   // sky gives about 1.4:1 and simply vanishes; this lifts it until the outline
   // reads without the rock ever looking lit.
-  rockLift:1.9,       // overall value of the rock. 1 = the old near-black
-  rockHaze:.55,       // extra lift at the base, where distance haze pales it
-  rim:.22,            // lit rim on the seaward edge, brightening as the lamp sweeps
-  rimBase:.42,        // how much rim survives between sweeps. 0 = dark when idle
+  rockLift:2.8,       // overall value of the rock. 1 = the old near-black
+  rockHaze:.75,       // extra lift at the base, where distance haze pales it
+  rim:.34,            // lit rim on the seaward edge, brightening as the lamp sweeps
+  rimBase:.55,        // how much rim survives between sweeps. 0 = dark when idle
   seed:7,             // reshuffles the rock jitter. Any integer
   // A halo, not a shaft. In clear air a beam is invisible from the side and shows
   // only where it lands; the solid cone-in-the-sky is a fog effect, and drawing it
   // is what makes stylised lighthouses read as cartoons.
-  haze:.35,           // glow bloom around the lamp itself. 0 = bare point
-  hazeBase:.45,       // how much halo survives between sweeps. 0 = dark when idle
+  haze:.52,           // glow bloom around the lamp itself. 0 = bare point
+  hazeBase:.60,       // how much halo survives between sweeps. 0 = dark when idle
   // Where the rock meets the sea there is nothing marking the line, so the two
   // dark masses run together. A thin pale band separates them the way real
   // distance haze does at a waterline.
-  footHaze:.30,       // brightness of the band at the cliff foot. 0 = none
+  footHaze:.42,       // brightness of the band at the cliff foot. 0 = none
   // The beam sweeps behind the hero copy, and a moving bright wedge under text is
   // the one thing that actually hurts readability here. This holds it back.
   beamGuard:1.0,      // 0 = no guard, 1 = beam fully suppressed behind the copy
