@@ -1,1297 +1,1093 @@
-// Simulated water for the masthead. The height field is a real wave equation
-// (see simStep); the lines read it off the surface rather than making it.
+// Animated water for the hero, on the GPU.
 //
-// Developed in designs/rope-waves-sim.html, which loads this same file and adds
-// the tuning panel on top. Tuned values live in DEF below -- edit them here.
+// The wave equation runs as a fragment shader over a 340x210 float texture --
+// R = height, G = velocity, ping-ponged between two framebuffers. The lines are
+// tessellated in a vertex shader: each segment becomes two triangles, which is
+// what Canvas2D's stroke() did for free. Gusts stay on the CPU, where the random
+// numbers and branching they need are cheap, and upload once per frame.
 //
-// The canvas sizes to its parent, not the window, so the hero can be any height.
+// This replaces a Canvas2D renderer that cost ~13.9ms of GPU time per frame
+// against ~3.2ms here, measured with EXT_disjoint_timer_query. The old renderer
+// is gone rather than kept as a fallback: it was slower than this path is on the
+// machines that would need a fallback at all.
+//
+// Two things in here look like mistakes and are not:
+//
+//   * The sim texture is CLAMP_TO_EDGE and x is wrapped with fract() in the
+//     shader, rather than using REPEAT. WebGL1 treats a non-power-of-two texture
+//     with REPEAT as INCOMPLETE, and every texture2D on it silently returns
+//     (0,0,0,1) -- no error, no warning, and the sim runs perfectly while reading
+//     nothing but zeros.
+//
+//   * Lines carry their own edge antialiasing in the fragment shader. MSAA only
+//     smooths where triangles meet, and a line's long edges are the silhouette of
+//     a single quad, so without it every line has hard stair-stepped sides.
+window.WATER = window.WATER || {};
 (function(){
 'use strict';
-
 const cv=document.getElementById('scene');
 if(!cv) return;
-const g=cv.getContext('2d');
+const gl=cv.getContext('webgl',{antialias:true,alpha:false,depth:false});
+if(!gl) throw new Error('WebGL unavailable. This spike needs WebGL 1 with float '+
+  'textures; in Firefox check webgl.disabled is false in about:config.');
 
-// The panel (designs/water-panel.js) fills these in when it loads. Without it
-// they stay inert, so the renderer has no UI dependency.
-const WATER={paused:false, onFrame:null};
-window.WATER=WATER;
+// Float textures are not optional here: the sim stores height and velocity, both
+// signed and both small, and 8-bit would quantise the whole field to mush.
+const EXT_F=gl.getExtension('OES_texture_float');
+if(!EXT_F) throw new Error('OES_texture_float missing. The wave sim stores signed '+
+  'height/velocity per cell and cannot run in 8-bit. Try a different browser or GPU.');
 
-// ---- ?bare=N -- bisect the render cost -------------------------------------
-// Each level adds one stage back, so reloading through 0..4 says WHERE the cost
-// appears rather than only whether it exists. Compare against level 0: that is a
-// cleared canvas plus a rAF loop and nothing else, so if level 0 is already slow
-// the cost is not in this file at all.
-//   0 clear only   1 +sky/sea/lighthouse   2 +wave simulation
-//   3 +line geometry (no strokes)          4 full render (default)
-const BARE=(function(){
-  const m=/[?&]bare=(\d)/.exec(location.search);
-  return m?Math.max(0,Math.min(4,+m[1])):4;
-})();
-WATER.bare=BARE;
+const P={
+  // --- geometry / framing (matches water.js) ---
+  lines:120, horizon:.34, persp:1.75,
+  // Keeps the horizon below the masthead so body copy never sits on busy water.
+  // Measured against the live page: with the water running under the intro the
+  // contrast was 3.14 average and 1.0 worst case -- text pixels the same colour
+  // as the water. That is the water itself, not the beam. Below about 591px of
+  // viewport height the layout has no room, so the horizon yields instead.
+  copyClear:26,       // px of water-free margin kept under the masthead copy
+  ptStep:4.5,
+  amp:.064, ampNear:1.0,
 
-// ?bare is a measuring tool, so it carries its own readout -- the panel is
-// #tune-only and there would otherwise be no fps number to read.
-let bareHud=null;
-if(/[?&]bare=/.test(location.search)){
-  addEventListener('DOMContentLoaded',()=>{
-    bareHud=document.createElement('div');
-    bareHud.style.cssText='position:fixed;left:10px;top:10px;z-index:99999;'+
-      'font:600 13px/1.5 ui-monospace,Menlo,monospace;color:#F0A94C;'+
-      'background:rgba(7,10,16,.92);border:1px solid #1B2430;border-radius:7px;'+
-      'padding:7px 11px;white-space:pre;pointer-events:none';
-    document.body.appendChild(bareHud);
-  });
-}
-const BARE_WHAT=['clear only','+ sky / sea / lighthouse','+ wave simulation',
-                 '+ line geometry (no strokes)','full render'];
-function bareReport(fps,N){
-  if(!bareHud) return;
-  bareHud.textContent='bare='+BARE+'  '+fps.toFixed(0)+' fps\n'+BARE_WHAT[BARE]+
-    (N?('\nlines '+N):'');
-}
+  // --- the simulation (values carried over from water.js, already tuned) ---
+  simW:340, simH:210,
+  simGain:4,
+  stiff:1.85,         // hard CFL ceiling at 2.0; see water.js
+  breakAt:.0008,      // squared-slope threshold where a crest starts to break
+  breakRate:6,        // how hard excess steepness is bled off
+  visc:.35,           // short-wave-only viscosity
+  damp:.12,           // per-step decay
+  speed:.13,          // simulated seconds per real second
+  gustDir:1.0,
+  hzSkirt:6, fetch:34, skirt:20,
+  wind:1.15, gustRate:34, gustSize:17,
+  windDir:1.45, windSpread:.10,
+
+  // --- stage 2: weather -----------------------------------------------------
+  // The gust forcing above is a constant: every gust for the rest of time is the
+  // same strength, so the sea reaches one energy level and sits there. Real water
+  // is never in steady state -- it builds, holds, and eases over minutes. These
+  // modulate wind strength and heading slowly so the surface has a history.
+  gustVary:.55,       // per-gust strength jitter. 0 = every gust identical
+  weather:.60,        // depth of the slow build/ease. 0 = steady wind
+  // Rates are in SIM seconds and the sim runs at speed 0.13, so a real-time
+  // period is 1/rate/0.13. These give ~26s and ~75s of wall clock: long enough
+  // that the surface is not obviously cycling, short enough that someone who
+  // looks for a few seconds sees it change rather than assuming it is static.
+  weatherRate:.30,    // ~26s real
+  veer:.22,           // how far the heading wanders, radians
+  veerRate:.10,       // ~77s real
+  lull:.30,           // chance a gust is skipped, thinning the field in the lulls
+  swell2:.50, swell2Ang:.9, swell2Len:1.7, swell2Crest:0.7, swell2Amp:1.4,
+
+  // --- look ---
+  // widthNear was 1.5, giving far lines 0.5x and near ones 2.0x -- a 4:1 spread
+  // that made the foreground read as a different drawing from the background.
+  // Depth is carried by dimFar and the shading; width barely needs to help.
+  width:1.25, widthNear:.45, dimFar:.30, bright:1.55,
+
+  // --- stage 3: shading -----------------------------------------------------
+  // Height-based lighting glows AT the crest, which reads as a glowing ridge.
+  // Real water glows where the surface TILTS toward the light, which is on the
+  // flanks -- that puts two bright bands per wave with a darker seam along the
+  // crest itself. Pure slope loses which way is up, so this blends the two.
+  slopeLit:.70,       // 0 = all height, 1 = all slope
+  litRange:.95,       // lit value mapping to full brightness
+  litGamma:.75,       // <1 lifts the mid-tones, where nearly all the surface sits
+  floor:.14,          // darkest a segment gets, as a fraction of full
+  crest:1.4,          // extra gain on the sharpest crests
+  glow:2.2,           // width multiplier for the glow pass. 0 = no glow
+  glowAmt:.20,        // its alpha, relative to the line
+
+  // --- stage 3: the light ---------------------------------------------------
+  // A position and a sweep, standing in for the lighthouse. Where the beam lands
+  // the water lifts and warms; elsewhere it keeps the cool base colour.
+  beam:1.0,           // master intensity. 0 = off
+  lampX:.42,          // where the lamp sits across the screen, 0..1
+  beamWidth:.30,      // angular half-width of the lit cone, radians
+  beamSoft:.55,       // fraction of the cone that is soft edge
+  beamLift:1.6,       // specular gain on crests facing the lamp
+  beamWarm:1.0,       // how far lit water shifts toward amber
+  beamSat:.72,        // amber saturation. 1 = full amber, 0 = neutral warm-white
+  beamSweep:2.0,      // seconds for one crossing
+  beamGapMin:8,       // seconds of dark between sweeps, low end...
+  beamGapMax:20,      // ...and high. Randomised: a FIXED gap is still a metronome,
+                      // just a sparser one, and a predictable beat behind copy
+                      // pulls the eye off the text.
+  beamDouble:6,       // odds of a double sweep, 1-in-N. 0 = never
+
+  // --- stage 4: the lighthouse ----------------------------------------------
+  // The structure the light comes from. With the headland on, lampX is ignored:
+  // the lamp rides the top of the tower, so the glare path on the water converges
+  // on the light the viewer can actually see rather than on a floating point.
+  sky:.55,            // lift of the sky band above the flat ground. 0 = no sky.
+                      // Not decoration: the rock is near-black, so without a
+                      // lighter band behind it the headland has nothing to read
+                      // against and simply vanishes.
+  cliff:1,            // draw the headland. 0 = open water, lamp sits on the horizon
+  cliffX:.80,         // where the cliff face meets the horizon, 0..1
+  cliffH:.085,        // mesa top above the horizon, as a fraction of height
+  cliffRough:.55,     // how broken the face and top edge are. 0 = clean
+  towerH:.055,        // tower height above the mesa, fraction of height
+  towerW:.0125,       // tower width, fraction of screen width
+  // The headland is the nearest solid thing in frame, and at night the sky is
+  // lighter than the land under it, not darker. Pure black rock on a near-black
+  // sky gives about 1.4:1 and simply vanishes; this lifts it until the outline
+  // reads without the rock ever looking lit.
+  rockLift:1.9,       // overall value of the rock. 1 = the old near-black
+  rockHaze:.55,       // extra lift at the base, where distance haze pales it
+  rim:.22,            // lit rim on the seaward edge, brightening as the lamp sweeps
+  rimBase:.42,        // how much rim survives between sweeps. 0 = dark when idle
+  seed:7,             // reshuffles the rock jitter. Any integer
+  // A halo, not a shaft. In clear air a beam is invisible from the side and shows
+  // only where it lands; the solid cone-in-the-sky is a fog effect, and drawing it
+  // is what makes stylised lighthouses read as cartoons.
+  haze:.35,           // glow bloom around the lamp itself. 0 = bare point
+  hazeBase:.45,       // how much halo survives between sweeps. 0 = dark when idle
+  // Where the rock meets the sea there is nothing marking the line, so the two
+  // dark masses run together. A thin pale band separates them the way real
+  // distance haze does at a waterline.
+  footHaze:.30,       // brightness of the band at the cliff foot. 0 = none
+  // The beam sweeps behind the hero copy, and a moving bright wedge under text is
+  // the one thing that actually hurts readability here. This holds it back.
+  beamGuard:1.0,      // 0 = no guard, 1 = beam fully suppressed behind the copy
+};
+// The values as written in this file, captured before loadPanel() layers a saved
+// blob on top. 'reset to file' returns here; 'save as default' writes the current
+// P over this, so a later reset returns to what you saved rather than to what I
+// last typed.
+const FILE_DEF={...P};
+const TAU=Math.PI*2;
 
 let W=0,H=0,DPR=1;
-function fit(){
-  DPR=Math.min(2,window.devicePixelRatio||1);
-  // A fixed canvas (the lab file) covers the viewport; an absolute one fills
-  // its positioned parent (the live page's hero). Measuring the element itself
-  // does not work -- we set its inline size below, so it would measure its own
-  // output -- so take the size from whichever box it is stretched to.
-  const box=cv.offsetParent;
-  if(getComputedStyle(cv).position==='fixed'||!box){ W=innerWidth; H=innerHeight; }
-  else { W=box.clientWidth; H=box.clientHeight; }
-  cv.width=W*DPR;cv.height=H*DPR;cv.style.width=W+'px';cv.style.height=H+'px';
-  g.setTransform(DPR,0,0,DPR,0,0);
-}
-addEventListener('resize',fit);
-// The hero can change height without the window resizing -- fonts landing, the
-// copy rewrapping, a stylesheet arriving late. Watch the box we size against.
-if('ResizeObserver' in window){
-  // Only ever react to a size we did not cause. fit() writes the canvas's inline
-  // size, which can feed back through the parent's layout; comparing against the
-  // last size we applied breaks that loop.
-  let lastW=-1,lastH=-1;
-  const ro=new ResizeObserver(()=>{
-    const box=cv.offsetParent;
-    const w=box?box.clientWidth:innerWidth, h=box?box.clientHeight:innerHeight;
-    if(w===lastW&&h===lastH) return;
-    lastW=w; lastH=h; fit();
-  });
-  ro.observe(cv.offsetParent||document.body);
-}
-fit();
 
-// ---- parameters -----------------------------------------------------------
-// AXES, as specified: x runs left-right across the screen, y runs front-to-back
-// (depth into the scene), z is altitude above sea level. Screen position is
-// x directly, and (depth row baseline - z) vertically.
-const DEF={
-  lines:120, horizon:.34, persp:1.75,
-
-
-  // the water simulation
-  simW:340, simH:210,   // grid resolution (simH includes the fetch band)
-  simTile:1.0,        // how much of the grid one screen width spans
-  simDepth:1.0,       // 1 = rows sample with true perspective depth, 0 = linear
-  simGain:4,         // height field -> wave height
-  // Stiffness has a HARD stability ceiling at 2.0 and it is not a matter of
-  // taste: above it the scheme diverges at ANY damping (measured -- 2.02
-  // whites out, 2.0 survives only with heavy damping, 1.9 is safe across the
-  // whole damping range). That is the CFL limit for this stencil, and it is
-  // why every copy of this shader on the internet hardcodes 2.0. The slider
-  // stops at 1.9 and simStep clamps anyway, since a preset or a pasted
-  // settings blob can reach past the slider.
-  stiff:1.85,         // how hard a cell is pulled toward its neighbours
-  breakAt:.0008,      // squared-slope threshold where a crest starts to break.
-                      // Below this a wave is untouched, so swell carries. Chosen
-                      // off the measured slope distribution: this is the 95th
-                      // percentile, so ~5% of the surface is breaking at a time.
-                      // The first guess (.004) sat above the field maximum and
-                      // never fired at all.
-  breakRate:6,        // how hard the excess steepness is bled off. 0 = no
-                      // breaking, which is the pre-breaking behaviour.
-  visc:.35,           // short-wave viscosity: extra decay applied ONLY to the
-                      // small-scale part of the velocity field, so chop dies
-                      // fast and long swell carries. 0 = uniform damping.
-  damp:.12,           // per-STEP decay, so a longer grid costs more: with the
-                      // fetch band added, .55 killed the swell halfway across
-                      // (near rows at 0.017 vs 0.031 at the horizon). .12
-                      // carries it the full depth -- near/far energy 1.07.
-  speed:.13,          // simulated seconds per real second. 1.0 crossed in 2.8s
-  gustDir:1.0,        // how one-way each gust launches. 0 = radiates both ways
-  hzSkirt:6,          // absorbing band at the horizon edge, in cells
-  fetch:34,           // off-frame rows upwind where waves are generated
-  skirt:20,           // near-edge absorbing band, in cells
-  wind:1.15,           // gust strength
-  gustRate:34,        // gusts per second
-  gustSize:17,        // gust footprint in cells
-  windDir:1.45,       // wave heading, radians. ~pi/2 travels toward the viewer
-  windSpread:.10,     // how much headings scatter around it. 0 = glassy corduroy
-  swell2:.50,         // share of gusts belonging to the crossing swell
-  swell2Ang:.9,       // its heading offset, radians. 0 = no crossing at all.
-                      // Must clear ~50 degrees to READ as a second direction:
-                      // at the old .6 (34 deg) the angular histogram showed a
-                      // single blob at 90, not two peaks -- the trains were
-                      // generated apart and merged, so the surface still looked
-                      // like everything moved one way. windSpread matters as
-                      // much: above ~13 deg the two peaks smear back together
-                      // whatever the separation.
-  swell2Len:1.7,      // its wavelength vs the main train (older = longer)
-  swell2Crest:0.7,    // its crest length vs the main train. Kept near 1: this is
-                      // footprint, not wavelength, and a wide stamp erases heading.
-  swell2Amp:1.4,      // its strength vs the main train
-
-  // Disorder that travels front-to-back. This shifts where a line READS its
-  // per-line randomness rather than adding height, so bands of the field go
-  // rough and then settle without competing with the water for the same
-  // visual channel.
-  chopLen:.55,        // how far apart the rough bands sit along y
-  chopRate:.85,       // how fast they travel
-  chopAmt:3.0,        // how far the read head shifts — 0 = disorder stands still
-
-  // rope look (the sim supplies height; these shape how it is drawn)
-  amp:.064,           // z amplitude, fraction of the sea band height
-  waveLen:.45,        // only sets the per-line wavenumber the foam test uses
-  // Perspective ALREADY makes far waves small: the row gap runs 1.4px at the
-  // horizon to 7.2px in front, a 10x size difference for free. ampNear multiplies
-  // on top of that, so 1.9 compounded to ~190x and gave a flat horizon under a
-  // storming foreground.
-  //
-  // The obvious fix -- ampNear 0, equal pixel height at every depth -- destroys
-  // the scene, and the reason is worth keeping. Perspective packs the far rows
-  // 9x closer together, so equal PIXEL amplitude makes a far wave 9x too big
-  // for the rows it belongs to. It does not read as flat, it reads as
-  // overscaled, and with no size gradient left the eye has nothing to judge
-  // distance by: the water becomes a vertical wall of brushed metal. 0.55 is
-  // already halfway there, the mid-field going to fabric whorls.
-  //
-  // Measured in row-spacings -- the units that decide whether a wave looks
-  // like a wave -- 1.0 is nearly flat ALREADY: 3.5 row-gaps at the horizon
-  // against 4.6 in front, a 1.3x spread hiding inside a 12.8x pixel ratio.
-  // The apparent front-to-back imbalance was mostly brightness; see dimFar.
-  ampNear:1.0,        // how much taller the near lines swing
-  // Gerstner steepness. A sine is symmetric -- crest and trough the same shape --
-  // but water particles move in circles, so real waves have SHARP crests over
-  // BROAD flat troughs. Measured skew: pure sine 0.00, our 2nd harmonic -0.34
-  // (pointing the wrong way, sharpening the troughs), Gerstner at .45 gives
-  // +0.48, inside the +0.3..+0.8 range real ocean sits in. Points are pushed
-  // horizontally toward each crest, which bunches them there and thins the
-  // troughs -- the visual signature of water rather than a wiggly line.
-  steep:.45,
-  ropeRand:.55,
-  // Reflection and crossing swells used to be parameters here: a hand-added
-  // backwards copy of the wave, and four hand-placed headings. Both are gone
-  // because the simulation does them for real -- a wave meeting the near-edge
-  // skirt, or two gusts meeting each other, interfere because that is what the
-  // neighbour coupling DOES. Ten sliders became four gust controls.
-  smooth:.6,          // Taubin smoothing strength
-  smoothPass:2,       // how many smoothing passes
-  // groups: swell arrives in sets. This is an ENVELOPE, not a wave -- it
-  // scales how hard each patch of water swings rather than adding height of
-  // its own. It replaces what used to be a "tide" that also lifted lines
-  // bodily: measured, that additive lift LOWERED group contrast (1.26 vs 1.30
-  // without it), because moving every point of a rope by the same amount
-  // cannot make one patch livelier than another. The crossing swells now carry
-  // the y-direction height the tide used to fake.
-  // chop: disorder that travels front-to-back. This is the surviving half of
-  // the old ripple: it shifts where a line READS its randomness rather than
-  // adding a displacement, so bands of the field go choppy and then settle
-  // without competing with the rope's own randomness for the same channel.
-
-  // look
-  bright:1.0, glow:4.2, width:1.0, crest:1.4,
-  // --- Lighthouse ---------------------------------------------------------
-  beam:1.0,           // master intensity. 0 = off.
-  beamSweep:2.0,      // seconds for one crossing of the field.
-  beamGapMin:8,       // seconds of dark between sweeps, low end...
-  beamGapMax:20,      // ...and high end. Randomised per sweep: a FIXED gap is
-                      // still a metronome, just a sparser one, and behind body
-                      // copy a predictable beat pulls the eye off the text.
-  beamDouble:6,       // odds of a double sweep: 1-in-N. 0 = never. Random
-                      // rather than every-Nth for the same reason as the gap --
-                      // a deterministic count is a pattern at a longer period.
-  beamWidth:.30,      // angular half-width of the cone, in radians.
-  beamSoft:.55,       // fraction of the cone that is soft edge.
-  beamLift:1.6,       // specular gain on crests facing the lamp.
-  cliff:1,            // draw the headland. 0 = open water, lamp floats on the horizon.
-  cliffX:.80,          // where the cliff face meets the horizon, 0..1.
-  cliffH:.085,        // mesa top above the horizon, as a fraction of height.
-  cliffRough:.55,     // how broken the cliff face and top edge are. 0 = clean.
-  towerH:.055,        // tower height above the mesa, fraction of height.
-  lampX:.42,          // lamp position across the screen, 0..1. Ignored when
-                      // cliff is on -- the lamp rides the tower instead.
-  beamSat:0.72,      // amber saturation. 1 = full amber, 0 = neutral warm-white.
-  beamWarm:1.0,       // how far lit water shifts toward amber. 0 = stays cool.
-  copyClear:26,       // px of water-free margin kept under the masthead copy.
-                      // Pushes the horizon down on short viewports rather than
-                      // letting waves run under the text. 0 disables.
-  beamGuard:1.0,      // how strongly the beam is held back behind the masthead
-                      // copy. Measured: at viewport heights under ~591px the
-                      // horizon rises past the copy, and an amber wash under the
-                      // intro paragraph took contrast to 1.0 (text and water the
-                      // same colour -- literally invisible) against WCAG AA's
-                      // 4.5 for body text. 0 disables the guard.
-  beamHaze:.35,       // glow bloom around the lamp itself. In CLEAR air a beam
-                      // is invisible from the side -- you only see where it
-                      // LANDS -- so there is deliberately no cone drawn in the
-                      // sky. Only the lamp gets a halo, which is the one part
-                      // real photographs show without fog.
-  wSteps:2,           // line-width buckets. Multiplies stroke count; see pass 3.
-  // Points per line are spaced ptStep CSS px apart, so this scales the whole
-  // geometry pass with viewport width. Nearly all the frame cost is per-point:
-  // halving the grid resolution or the brightness bands measured as noise, while
-  // this and ptRef together took a 2000px window from 40 to 55 fps.
-  ptStep:4.5,
-  ptScale:1,          // 1 = widen point spacing on large viewports, 0 = off
-  ptRef:1100,         // viewport width below which spacing is left alone
-  // Gerstner refinement iterations. Each one costs a full simAtBox (up to 6
-  // height samples on far rows), so this multiplies the inner loop directly.
-  gerstner:3,
-  // Adaptive quality. A default tuned on one machine is wrong on every other
-  // one, and slow is the failure that shows. Below adaptMin fps the renderer
-  // coarsens point spacing until frames fit, up to adaptMax x the tuned spacing.
-  adapt:1,            // 0 disables, pinning quality to the tuned values
-  adaptMin:50,        // target floor, in fps
-  adaptMax:2.2,       // most it may coarsen: 4.5px spacing -> 9.9px
-  bands:48,           // brightness levels. This is a BATCHING budget, not a look:
-                      // each band is one beginPath/stroke for every segment in
-                      // it, so the count trades draw calls against tonal
-                      // smoothness. Measured: 32->118fps, 64->100, 96->75,
-                      // 200->59. 64 is where the terracing stops being visible
-                      // and the cost is still small.
-  dithAmt:0,          // Jitter across band edges. OFF: measured free (118 vs 116
-                      // fps), so it was never earning its keep, and what it
-                      // actually did was trade contour lines for speckle -- the
-                      // water read as grainy rather than wet. With enough bands
-                      // there is no edge left to hide, which is the better fix.
-  dimFar:.55,         // horizon brightness as a fraction of the foreground's
-  // Lighting mix. Height-based lighting glows AT the crest, which reads as a
-  // glowing ridge; real water glows where the surface TILTS toward the light,
-  // which is on the flanks. Slope lighting puts two bright bands per wave with a
-  // dark seam along the crest itself. Pure slope loses which way is up, so this
-  // blends: 0 = all height (as before), 1 = all slope. 0.55 lit almost the whole
-  // surface and washed out the troughs, so the default sits lower.
-  slopeLit:.70,
-  slopeSmooth:4,      // taps each side when low-passing slope along a line. 0 =
-                      // raw per-segment slope, which speckles (see the draw loop).
-  litRange:.95,       // lit value that maps to full brightness. Lower = the
-                      // shading reaches white sooner, so more of the water is
-                      // in the bright half of the scale.
-  litGamma:.75,       // curve on the shading. <1 lifts the mid-tones, which is
-                      // where nearly all the surface sits.
-  floor:.14,          // darkest a segment gets, as a fraction of full. Replaces
-                      // the old hardcoded 0.65, which wasted 19 bands.
-  // Foam: bright specks on the steepest crests only. The trigger is slope
-  // normalised by the line's own amp*k, which is scale-free -- a fixed slope
-  // threshold caught 8% of far lines and 60% of near ones, since slope scales
-  // with amplitude. At 2.0 about 2-6% of segments foam, and it responds to
-  // steepness the way it should: 0% at crest sharpness .2, ~10% at .7.
-  foam:.45, foamAt:2.0,
-
-  seed:7,             // reroll the per-line randomness
-  randScale:8,        // lines per random anchor — how slowly randomness drifts
-  randOct:4,          // octaves of detail on top of that drift
-};
-// Live tweaks are lost on reload unless saved. SET AS DEFAULT writes the current
-// values here; RESET drops them and returns to the DEF block above.
-const STORE='rws.defaults';
-function loadSaved(){
-  try{
-    const raw=localStorage.getItem(STORE); if(!raw) return null;
-    const o=JSON.parse(raw); if(!o||typeof o!=='object') return null;
-    // Only accept keys DEF knows about, so a stale save can't inject junk.
-    const clean={};
-    for(const k of Object.keys(DEF)) if(typeof o[k]==='number'&&isFinite(o[k])) clean[k]=o[k];
-    return clean;
-  }catch(e){ return null; }
-}
-const SAVED=loadSaved();
-const P={...DEF,...(SAVED||{})};
-
-// ---- draw -----------------------------------------------------------------
-const COOL=[143,182,217], AMBER=[236,196,150], TAU=Math.PI*2;
-// Warm-tint buckets: a segment's colour is COOL->AMBER by how much beam it
-// caught. Banding by alpha alone would force one colour per band, so the beam
-// gets its own axis and each band is drawn once per tint bucket it uses.
-const TINTS=5;
-
-// Per-line randomness, drawn ONCE per (seed, line count) and cached. Rolling new
-// numbers every frame would make the lines flicker; what makes neighbours differ
-// without jitter is that each line keeps its own offsets for good.
-let RND=null, rndKey='';
-function lineRandom(N,seed,scale,oct){
-  const key=N+':'+seed+':'+scale.toFixed(2)+':'+oct;
-  if(key===rndKey) return RND;
-  let sd=(seed>>>0)||1;
-  const rnd=()=>{sd^=sd<<13;sd>>>=0;sd^=sd>>17;sd^=sd<<5;sd>>>=0;return sd/4294967296;};
-
-  // Coherent noise along the line index. Instead of an independent random number
-  // per line, pick values at anchors every `scale` lines and interpolate between
-  // them with a smoothstep — so a line's value is always close to its
-  // neighbours' and the randomness itself reads as a slow wave along y.
-  // `oct` octaves add finer detail on top at half amplitude each, which is what
-  // keeps it from looking like a plain sine.
-  function coherent(N,scale,oct){
-    const out=new Float64Array(N);
-    let amp=1, tot=0, sc=Math.max(1,scale);
-    for(let o=0;o<Math.max(1,oct);o++){
-      // Periodic: the anchor ring wraps, so noise[N-1] flows back into noise[0].
-      // Chop slides the sampling position past both ends of this array, and
-      // a non-periodic one leaves an 8x discontinuity at the join that sweeps
-      // through the field as a visible crease.
-      const nA=Math.max(2,Math.round(N/sc)), A=new Float64Array(nA);
-      for(let a=0;a<nA;a++) A[a]=rnd()*2-1;
-      for(let i=0;i<N;i++){
-        const f=i/sc, a0=f|0, u=f-a0;
-        const w=u*u*(3-2*u);              // smoothstep: flat slope at each anchor
-        out[i]+=amp*(A[a0%nA]*(1-w)+A[(a0+1)%nA]*w);
-      }
-      tot+=amp; amp*=0.5; sc*=0.5;
-    }
-    for(let i=0;i<N;i++) out[i]/=tot;     // renormalise back to about [-1,1]
-    return out;
-  }
-
-  const r={
-    len:    coherent(N,scale,oct),
-    amp:    coherent(N,scale,oct),
-  };
-  RND=r; rndKey=key; return r;
-}
-
-// Read a noise array at a fractional line position. Chop shifts where a
-// line samples its randomness, and that shift is continuous — sampling at the
-// nearest whole index instead would snap from line to line and flicker.
-function sampleN(arr,f){
-  const n=arr.length;
-  // wrap rather than clamp: chop can push the sampling position well past
-  // either end, and clamping would make every line out there read the same
-  // value — a flat dead band at the horizon and in the foreground.
-  let g=f%n; if(g<0)g+=n;
-  const i0=g|0, u=g-i0, w=u*u*(3-2*u);
-  return arr[i0]*(1-w)+arr[(i0+1)%n]*w;
-}
-
-// Rows are spaced so they crowd toward the horizon — the whole depth cue.
-function rowY(i,N,hz){
-  const u=i/(N-1);
-  return hz + (H-hz)*Math.pow(u,P.persp);
-}
-
-let t=0, last=performance.now(), fps=60;
-
-// ---- adaptive quality -------------------------------------------------------
-// Point spacing is multiplied by this. 1 = the tuned defaults; higher = coarser
-// and cheaper. Nearly all frame cost is per-point, so this is close to a direct
-// dial on frame time.
-let quality=1;
-// Glow multiplier, 1 = full. Only touched once point spacing is at adaptMax.
-let glowFade=1;
-// Wait for the tab to settle -- first frames include layout, font and decode
-// work that has nothing to do with how fast this machine renders water, and
-// reacting to them would coarsen a display that never needed it.
-let adaptFrames=0;
-function adaptQuality(){
-  if(P.adapt<=0){ quality=1; glowFade=1; return; }
-  if(++adaptFrames<90) return;                 // ~1.5s of warm-up
-  // Only act on a sustained reading. fps is smoothed at 0.08, so a single long
-  // frame (a GC pause, another tab waking up) moves it a little and a genuine
-  // shortfall moves it a lot; the deadband keeps the two apart.
-  if(fps<P.adaptMin){
-    if(quality<P.adaptMax){
-      // Jump by how far short we are, not by a fixed nudge. Cost is ~linear in
-      // point count and point count ~1/spacing, so spacing needs to scale by about
-      // adaptMin/fps to hit target; capped per move so one bad frame cannot halve
-      // the resolution, and overshooting is cheap to walk back.
-      const want=Math.min(1.6,Math.max(1.05,P.adaptMin/Math.max(5,fps)));
-      quality=Math.min(P.adaptMax,quality*want);
-      adaptFrames=45;                          // let it settle before judging again
-    } else if(glowFade>0){
-      // Spacing is spent and we are still short, so the machine is limited by
-      // pixels rather than points -- fill rate does not care how many segments
-      // there are, only how much area they cover. Fade the glow out instead.
-      glowFade=Math.max(0,glowFade-0.15);
-      adaptFrames=45;
-    }
-  } else if(fps>P.adaptMin+4){
-    // +4, not a wide band: on a 60Hz display fps tops out near 60, so a recovery
-    // threshold above that can never be met and quality would ratchet down and
-    // stay there. The asymmetric rates below are what damp the oscillation.
-    if(glowFade<1){ glowFade=Math.min(1,glowFade+0.05); adaptFrames=90; }
-    else if(quality>1){
-      quality=Math.max(1,quality/1.03);        // recover slower than we back off
-      adaptFrames=90;
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// The water itself.
-//
-// This is the discrete wave equation, the same eight lines every GPU water toy
-// runs: each cell accelerates toward the average height of its four neighbours,
-// velocity is damped, height integrates. Waves are not written down here --
-// they are what the loop DOES. Reflection is what happens at a boundary,
-// interference is what happens when two ripples meet, and groups fall out of
-// dispersion. The sine version had to fake all three by hand.
-//
-// It runs on the CPU because it is cheap: 0.19ms per step at 320x160, about
-// 1.5% of a frame. A GPU version would buy nothing and cost the build step.
-//
-// What it CANNOT do is sharp crests. The linear wave equation is symmetric by
-// construction -- measured skew hovers at 0.0 no matter how it is forced --
-// while real water has sharp crests over broad troughs. So the Gerstner warp
-// stays, now applied to the simulated surface rather than to a sine.
-// ---------------------------------------------------------------------------
-const SIM={W:0,H:0,h:null,v:null,acc:0};
-
-// A fixed 64-entry blue-ish noise table for dithering the alpha bands. Fixed
-// rather than Math.random() per segment: random would make every segment
-// shimmer independently every frame, which reads as static crawling over the
-// water. Indexed by position along the line, so the pattern is stable frame to
-// frame and the dither disappears into texture instead of animating.
-const dith=(()=>{
-  const a=new Float64Array(64); let sd=1013904223;
-  for(let i=0;i<64;i++){sd=(sd*1664525+1013904223)>>>0; a[i]=sd/4294967296;}
-  return a;
-})();
-
-function simInit(w,hh){
-  SIM.W=w; SIM.H=hh;
-  SIM.h=new Float32Array(w*hh); SIM.v=new Float32Array(w*hh); SIM.acc=0;
-}
-
-function simStep(){
-  const {W:w,H:hh,h,v}=SIM;
-  const k=Math.min(1.95,Math.max(0,P.stiff)), damp=1-Math.max(0,P.damp)*0.02;
-  // Viscosity is wavelength-dependent in real water -- decay goes roughly as
-  // 1/lambda^2, which is why chop dies in a few seconds and ocean swell crosses
-  // an ocean. A single scalar damp cannot do that: it takes the same bite out of
-  // a 15px ripple and a 26px swell, so everything faded in lockstep and a crest
-  // crossed the whole field keeping 64% of its height.
-  //
-  // The 4-neighbour mean of v is a low-pass of the velocity field, so v minus
-  // that mean is its SHORT-wavelength part. Damping only the residual leaves long
-  // waves nearly untouched while chop decays fast. Costs one extra mean per cell.
-  const visc=Math.max(0,P.visc)*0.25;
-  // Breaking. Viscosity alone damps every wave by the same fraction whatever its
-  // shape, and measured against real water that is the wrong mechanism entirely:
-  // at this framing pure viscous decay gives a 1.2m wave a half-life of HOURS,
-  // so it is not what makes real waves die. Breaking is. A wave steepens until
-  // its face collapses, dumping energy all at once, and a gentle swell alongside
-  // it keeps going untouched. That is why real water looks like it decays fast
-  // while ocean swell still crosses oceans -- the loss depends on STEEPNESS, not
-  // on time.
-  //
-  // So: past a slope threshold, bleed velocity in proportion to the excess. The
-  // gradients are already loaded here for the wave equation, so this reuses them
-  // -- no extra memory traffic, and comparing squared slope against a squared
-  // threshold avoids a sqrt per cell. Measured at 0.25% of wall time.
-  const brk=Math.max(0,P.breakAt), brkR=Math.max(0,P.breakRate);
-  const doBrk=brkR>0;
-  for(let y=1;y<hh-1;y++){
-    const r=y*w;
-    for(let x=1;x<w-1;x++){
-      const i=r+x;
-      const hl=h[i-1], hr=h[i+1], hu=h[i-w], hd=h[i+w];
-      const avg=(hl+hr+hu+hd)*0.25;
-      let nv=(v[i]+(avg-h[i])*k)*damp;
-      const vAvg=(v[i-1]+v[i+1]+v[i-w]+v[i+w])*0.25;
-      nv-=(nv-vAvg)*visc;
-      if(doBrk){
-        const gx=(hr-hl)*0.5, gy=(hd-hu)*0.5;
-        const sq=gx*gx+gy*gy;
-        // Clamped: this term is the only nonlinear one in the scheme, and an
-        // unbounded state-dependent subtraction can outrun the CFL limit. Half
-        // the velocity is the most any single step may remove.
-        if(sq>brk) nv*=1-Math.min(.5,(sq-brk)*brkR);
-      }
-      v[i]=nv;
-    }
-  }
-  for(let i=0;i<h.length;i++) h[i]+=v[i];
-
-  // Open water, not a pool. Their demo is a box with hard walls and it rings
-  // like a drum; ours has to run off past the edge of the frame.
-  //   x wraps: no side walls at all, swell just keeps going.
-  //   BOTH y edges get a damping skirt so waves leave instead of bouncing.
-  //
-  // The horizon edge used to be left clamped, on the theory that it was "live"
-  // so swell could march in from beyond the frame. Nothing forces it there,
-  // though, so in practice it was simply a wall: a single pulse sent at it came
-  // back with 20% of its energy, and the returning waves stood against the
-  // incoming ones. That standing pattern is what read as a POOL -- 25% of all
-  // motion was whole rows heaving in unison, the bounce off the far end,
-  // instead of crests travelling past. Absorbing at both ends drops that to a
-  // few percent and the swell reads as passing through.
-  for(let y=0;y<hh;y++){
-    h[y*w]=h[y*w+w-2]; h[y*w+w-1]=h[y*w+1];
-    v[y*w]=v[y*w+w-2]; v[y*w+w-1]=v[y*w+1];
-  }
-  const sk=Math.max(1,P.skirt|0);
-  for(let y=hh-sk;y<hh;y++){
-    const f=0.5+0.5*(hh-1-y)/sk, r=y*w;
-    for(let x=0;x<w;x++){ h[r+x]*=f; v[r+x]*=f; }
-  }
-  const hsk=Math.max(1,P.hzSkirt|0);
-  for(let y=0;y<hsk;y++){
-    const f=0.5+0.5*y/hsk, r=y*w;
-    for(let x=0;x<w;x++){ h[r+x]*=f; v[r+x]*=f; }
-  }
-
-  // No mean-subtraction here. It is tempting -- the standing pattern shows up
-  // as rows bobbing -- but for swell travelling along y the row mean IS the
-  // wave: a crest running along x lifts that whole row as it passes. Removing
-  // per-row means would erase the swell and keep only the cross-swell texture.
-  // The standing pattern is fixed at its source instead: waves that reflect
-  // (absorbed at both ends now) and gusts that radiate backwards (see simGust).
-
-
-  // Backstop. The clamp above keeps the scheme inside its stability limit, but
-  // a big enough wind on a small enough grid can still pump energy in faster
-  // than the skirt takes it out, and an unbounded height field renders as a
-  // white screen rather than as anything recognisable. Check occasionally --
-  // every step would cost more than the simulation -- and if the surface has
-  // run away, scale the whole field back rather than clearing it, so the water
-  // sags instead of blinking out.
-  if((SIM.tick=(SIM.tick|0)+1)%30===0){
-    let e=0;
-    for(let i=0;i<h.length;i+=7) e+=h[i]*h[i];
-    const rms=Math.sqrt(e/(h.length/7));
-    if(!isFinite(rms) || rms>3){
-      if(!isFinite(rms)){ h.fill(0); v.fill(0); }
-      else { const f=3/rms; for(let i=0;i<h.length;i++){ h[i]*=f; v[i]*=f; } }
-    }
-  }
-}
-
-// Wind forcing. Point drops (their raindrops) give skew +1.4 -- pond, not sea.
-// Full-width crest lines give skew 0.0 and just rebuild the sine problem. A
-// localized elliptical patch of ripple is the middle: a gust hitting one bit of
-// water, which then spreads and interferes on its own.
-let gustSeed=12345, gustAcc=0;
-function grnd(){gustSeed^=gustSeed<<13;gustSeed>>>=0;gustSeed^=gustSeed>>17;gustSeed^=gustSeed<<5;gustSeed>>>=0;return gustSeed/4294967296;}
-function simGust(){
-  const {W:w,H:hh,h,v}=SIM;
-  // Gusts carry a HEADING. Round gusts dropped at random places make a pond:
-  // energy radiates outward equally in every direction, so the field is
-  // isotropic and there is no swell to look at. Measured, the old forcing sat
-  // at anisotropy 1.0 (mean |dh/dx| over |dh/dy|), and no combination of size,
-  // rate and length moved it off 1.0 without collapsing to 2-4 huge waves --
-  // the sliders traded density against direction and could not give both.
-  //
-  // Real water gets its direction from wind fetch: the wind blows one way, so
-  // successive gusts reinforce the same crest lines instead of cancelling.
-  // Modelling that is one rotation. Each gust is an ellipse elongated ALONG
-  // the crest (across the travel direction) carrying a sinusoid whose phase
-  // advances only along travel, and headings are drawn from a narrow spread
-  // around windDir rather than the full circle. That lands at anisotropy 0.30,
-  // with the crests running across the view and marching toward the viewer.
-  // A SECOND SWELL, crossing the first. With one train the surface has 69.5% of
-  // its gradient energy inside a single 30-degree band, so crests only ever
-  // stack -- they superpose and pass through, and nothing cancels. Real water
-  // almost always carries more than one train (local wind sea over a swell from
-  // an older, distant storm), and the moments where a crest briefly doubles or
-  // flattens out are those two trains crossing. Widening windSpread does NOT
-  // produce this: it blurs one train into mush rather than adding a second
-  // direction. So gusts are drawn from one of two headings.
-  const second = grnd() < P.swell2;
-  const base = second ? P.windDir + P.swell2Ang : P.windDir;
-  const th = base + (grnd()-0.5)*2*P.windSpread;
-  // Waves are BORN UPWIND, off-frame, and travel in. Spawning across the whole
-  // visible depth meant crests materialised in the middle of the scene, which
-  // no real water does -- swell always arrives from somewhere. The grid carries
-  // a fetch band above the first drawn row that is simulated but never seen;
-  // gusts land there and march into view already formed.
-  const cx=grnd()*w|0;
-  const cy=(P.hzSkirt|0)+1+grnd()*Math.max(1,P.fetch)|0;
-  // The crossing train is longer-period. It is also STRONGER than the main train,
-  // which looks wrong written down but is what the measurement demanded: the
-  // short train is steeper for the same height, so at equal amplitude it owns the
-  // gradient histogram and the long swell never resolves as its own direction.
-  // At swell2Amp .85 the second peak was 24% of the first; at 1.4 it is 79%.
-  const gs = P.gustSize * (second ? P.swell2Len : 1);
-  // Footprint does NOT follow wavelength. Scaling both together made the long
-  // swell's stamp 127px across a 156px-deep field -- one gust covering the whole
-  // pool lifts everything at once instead of drawing a crest line, so its angular
-  // histogram came out flat (5% peak vs 13% for the short train) and the surface
-  // read as "one direction plus mush". A long swell has LONG CRESTS, not a bigger
-  // blob: stretch the wavelength, keep the patch the size of the base gust.
-  const fp = P.gustSize;
-  const along =Math.max(3,fp*0.9);   // extent along travel
-  const across=Math.max(3,fp*2.2*(second?P.swell2Crest:1));   // crest length, the long axis
-  const ph=grnd()*TAU, str=P.wind*0.10*(second?P.swell2Amp:1);
-  // Wavelength follows gust size. Setting it independently (the old gustLen)
-  // let short waves carry big-wave amplitude, which crosses the ropes over each
-  // other -- water never does that, and it read as grass rather than a surface.
-  const kk=2*Math.PI/Math.max(2,gs*0.9);
-  const ct=Math.cos(th), st=Math.sin(th);
-  const R=Math.ceil(Math.max(along,across));
-  for(let dy=-R;dy<=R;dy++){
-    const y=cy+dy; if(y<1||y>=hh-1) continue;
-    for(let dx=-R;dx<=R;dx++){
-      const u  =  dx*ct + dy*st;   // along travel
-      const vv = -dx*st + dy*ct;   // along crest
-      const d=Math.hypot(u/along, vv/across);
-      if(d>=1) continue;
-      const x=((cx+dx)%w+w)%w;
-      const env=str*(0.5+0.5*Math.cos(d*Math.PI));
-      // Launch the gust ALREADY MOVING downwind. Adding height alone makes a
-      // bump that collapses and radiates both ways, so half of every gust ran
-      // backwards toward the horizon and stood against the waves coming the
-      // other way -- measured, 24 of 70 frames drifted the wrong way. Setting
-      // the velocity in quadrature with the height (v = -c dh/du) is the
-      // standard way to launch a one-way wave: the pair reinforces downwind and
-      // cancels upwind.
-      h[y*w+x]+=Math.sin(u*kk+ph)*env;
-      v[y*w+x]-=Math.cos(u*kk+ph)*env*kk*P.gustDir;
-    }
-  }
-}
-
-// Sample the height field at a fractional grid position, bilinear so ropes
-// glide across cells instead of stepping between them.
-function simAt(fx,fy){
-  const {W:w,H:hh,h}=SIM;
-  let x0=Math.floor(fx), y0=Math.floor(fy);
-  const tx=fx-x0, ty=fy-y0;
-  y0=Math.max(0,Math.min(hh-2,y0));
-  const xa=((x0%w)+w)%w, xb=((x0+1)%w+w)%w;
-  const r0=y0*w, r1=r0+w;
-  return (h[r0+xa]*(1-tx)+h[r0+xb]*tx)*(1-ty)
-       + (h[r1+xa]*(1-tx)+h[r1+xb]*tx)*ty;
-}
-
-// Same read, but averaged over a footprint. Perspective means a far rope
-// covers many grid cells in the depth it spans while a near rope covers a
-// fraction of one; sampling both at a point aliases the far rows into hard
-// vertical bands -- the grid showing through as scenery. `fw` is how many
-// cells this rope's row is responsible for, so each one averages exactly the
-// water it actually covers.
-function simAtBox(fx,fy,fw){
-  if(fw<=1.2) return simAt(fx,fy);
-  const n=Math.min(6,Math.max(2,Math.round(fw)));
-  // fx is the same for every sample in the box, so the x wrap and its two
-  // columns are hoisted out: simAt would redo four modulos per sample, and this
-  // runs up to 4x per point (three Gerstner iterations plus the final read).
-  const {W:w,H:hh,h}=SIM;
-  const x0=Math.floor(fx), tx=fx-x0;
-  const xa=((x0%w)+w)%w, xb=((x0+1)%w+w)%w;
-  const inv=1/(n-1);
-  let a=0;
-  for(let q=0;q<n;q++){
-    const fy2=fy+(q*inv-0.5)*fw;
-    let y0=Math.floor(fy2); const ty=fy2-y0;
-    y0=y0<0?0:(y0>hh-2?hh-2:y0);
-    const r0=y0*w, r1=r0+w;
-    a+=(h[r0+xa]*(1-tx)+h[r0+xb]*tx)*(1-ty)
-      +(h[r1+xa]*(1-tx)+h[r1+xb]*tx)*ty;
-  }
-  return a/n;
-}
-
-// --- Lighthouse ------------------------------------------------------------
-// A steady orbit reads as a metronome behind text, so the lamp does one fast
-// eased sweep and then goes dark for a randomised gap. BEAM.a is the current
-// beam bearing in radians (0 = pointing straight at the viewer, +/- = off to
-// the sides); BEAM.on is 0 while dark.
-const BEAM={next:4, until:0, dir:1, left:0, on:0, a:0, lx:0, elev:.12};
-const GUARD={on:0, x0:0, x1:0, y1:0};
-// Gradient objects are expensive to build and only change when the geometry or
-// the beam state does, so they are rebuilt on a key rather than every frame.
-const GRAD={val:{}, key:{}};
-// Reused segment buckets for the draw pass, so a frame allocates nothing.
-// Buckets hold POINT INDICES into SCR.px/py, not [x,y] pairs: a pair per segment
-// meant ~40k two-element arrays per frame (266KB of garbage at 120 lines), and
-// the resulting GC pauses are exactly what a weaker machine feels as stutter.
-const DRAW={buf:null, n:0};
-// Per-frame scratch, grown as needed and never released. Same reason.
-const SCR={py:null, px:null, sl:null, sl2:null, by:null, cap:0, xcap:0};
-function scratch(np,M){
-  if(SCR.cap<np){
-    SCR.py=new Float64Array(np); SCR.sl=new Float32Array(np);
-    SCR.sl2=new Float32Array(np); SCR.by=new Float64Array(np); SCR.cap=np;
-  }
-  if(SCR.xcap<M){ SCR.px=new Float64Array(M); SCR.xcap=M; }
-}
-function grad(name,key,make){
-  if(GRAD.key[name]!==key){ GRAD.key[name]=key; GRAD.val[name]=make(); }
-  return GRAD.val[name];
-}
-function beamStep(t){
-  if(P.beam<=0){BEAM.on=0;return;}
-  if(t>=BEAM.next && BEAM.left<=0){
-    // Schedule a fresh burst: one sweep, or occasionally two back to back.
-    const n=(P.beamDouble|0)>0 && Math.random()<1/(P.beamDouble|0) ? 2 : 1;
-    // A lamp rotates one way, so every sweep runs the same direction. Viewed
-    // from the water with the light up on the right, clockwise carries the
-    // beam right-to-left, out toward open sea.
-    BEAM.left=n; BEAM.dir=-1;
-    BEAM.until=t+P.beamSweep;
-  }
-  if(BEAM.left>0 && t<BEAM.until){
-    const k=1-(BEAM.until-t)/Math.max(.01,P.beamSweep); // 0..1 across the sweep
-    // Ease: a real lamp rotating at constant rate crosses the field fastest
-    // when it points at you, because the bearing is a rotation projected onto
-    // a plane. smoothstep-inverse gives that accelerate-through-middle feel.
-    const e=k<.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2;
-    const span=Math.PI*0.62;
-    BEAM.a=BEAM.dir*(-span/2+e*span);
-    BEAM.on=1;
-  } else if(BEAM.left>0){
-    BEAM.left--;
-    if(BEAM.left>0){ BEAM.until=t+P.beamSweep; }        // double: go again now
-    else {
-      const lo=Math.min(P.beamGapMin,P.beamGapMax), hi=Math.max(P.beamGapMin,P.beamGapMax);
-      BEAM.next=t+lo+Math.random()*(hi-lo);
-    }
-    BEAM.on=0;
-  } else BEAM.on=0;
-}
-
-function frame(now){
-  const dt=Math.min(.05,(now-last)/1000); last=now;
-  fps+= ((1/Math.max(1e-4,dt))-fps)*0.08;
-  adaptQuality();
-  if(!WATER.paused) t+=dt;
-  beamStep(t);
-
-  if(BARE===0){                       // floor: clear a canvas, nothing more
-    g.globalCompositeOperation='source-over';
-    g.fillStyle='#070A10'; g.fillRect(0,0,W,H);
-    bareReport(fps,0);
-    if(WATER.onFrame) WATER.onFrame(fps,0,DPR);
-    requestAnimationFrame(tick); return;
-  }
-
-  // Horizon, floored below the masthead copy. Measured at 1100x560: the copy
-  // bottom (201px) sits past a 0.34*H horizon (190px) and the white wave lines
-  // run straight under the intro paragraph -- contrast 3.14 average and 1.0
-  // worst case, i.e. text pixels the same colour as the water. That is the
-  // water itself, not the beam: with the beam off it was still 3.14, and with
-  // the water off it was 7.37. Below about 591px of viewport height the layout
-  // simply has no room, so the horizon yields instead of the text.
+// The horizon, pushed down if the masthead would otherwise overhang the water.
+// Both the cliff builder and the line shader read this, so they cannot disagree
+// about where the sea starts.
+function horizonY(){
   let hz=H*P.horizon;
   if(P.copyClear>0){
-    // .copy in the lab file, .masthead on the live page -- whichever copy block
-    // the horizon has to clear.
     const ce=document.querySelector('.copy, .masthead');
     if(ce){
       // Relative to the CANVAS, not the viewport. Both rects are viewport-based,
       // so subtracting cancels the scroll offset -- otherwise scrolling the page
       // walks the copy up the screen and drags the horizon along with it.
       const cb=ce.getBoundingClientRect().bottom-cv.getBoundingClientRect().top+P.copyClear;
-      if(cb>hz) hz=Math.min(H*0.82,cb);}
+      if(cb>hz) hz=Math.min(H*0.82,cb);
+    }
   }
-  const N=P.lines|0;
-  // Where the lamp sits on screen: a fixed point on the horizon, off to one
-  // side. The beam sweeps from here, so the glare path converges on it.
-  // With the headland on, the lamp is pinned to the top of the tower so the
-  // glare path converges on the light the viewer can actually see. CLIFF is
-  // filled here and drawn after the water, since the water composites with
-  // 'lighter' and would glow straight through a clipped silhouette.
-  const CLIFF={on:P.cliff>0&&P.cliffH>0, x:W*P.cliffX, top:0, lampX:0, lampY:0};
-  let lampX, lampY;
+  return hz;
+}
+
+function fit(){
+  DPR=Math.min(2,devicePixelRatio||1);
+  W=innerWidth; H=innerHeight;
+  cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
+  buildLines();
+  buildCliff();
+}
+
+// ---------------------------------------------------------------- shaders ---
+function sh(type,src){
+  const o=gl.createShader(type);
+  gl.shaderSource(o,src); gl.compileShader(o);
+  if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))
+    throw new Error('Shader compile failed: '+gl.getShaderInfoLog(o)+'\n'+src);
+  return o;
+}
+function prog(vsSrc,fsSrc){
+  const p=gl.createProgram();
+  gl.attachShader(p,sh(gl.VERTEX_SHADER,vsSrc));
+  gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fsSrc));
+  gl.linkProgram(p);
+  if(!gl.getProgramParameter(p,gl.LINK_STATUS))
+    throw new Error('Program link failed: '+gl.getProgramInfoLog(p));
+  return p;
+}
+
+const VS_QUAD=`
+attribute vec2 p; varying vec2 uv;
+void main(){ uv=p*0.5+0.5; gl_Position=vec4(p,0.,1.); }`;
+
+// One step of the wave equation. R = height, G = velocity.
+// This is water.js simStep(), term for term.
+const FS_SIM=`
+precision highp float;
+varying vec2 uv;
+uniform sampler2D src;
+uniform vec2 texel;
+uniform float stiff, damp, visc, brkAt, brkRate;
+uniform float skirtT, skirtB;
+
+// x is periodic -- the sea runs off both sides into itself -- but y is not, so
+// only s is wrapped. This is done in the shader rather than with REPEAT because
+// the grid is 340x210: WebGL1 treats a non-power-of-two texture with REPEAT as
+// INCOMPLETE, and every texture2D on it silently returns (0,0,0,1). No error, no
+// warning, and the sim runs perfectly while reading nothing but zeros.
+vec4 tap(vec2 p){ return texture2D(src, vec2(fract(p.x), clamp(p.y,0.001,0.999))); }
+
+void main(){
+  vec4 c=tap(uv);
+  float h=c.r, v=c.g;
+
+  vec4 L=tap(uv-vec2(texel.x,0.)), R=tap(uv+vec2(texel.x,0.));
+  vec4 U=tap(uv-vec2(0.,texel.y)), D=tap(uv+vec2(0.,texel.y));
+
+  float avg=(L.r+R.r+U.r+D.r)*0.25;
+  float nv=(v+(avg-h)*stiff)*damp;
+
+  // Wavelength-dependent viscosity. The 4-neighbour mean of v is a low-pass of
+  // the velocity field, so v minus that mean is its SHORT-wavelength part.
+  // Damping only the residual lets chop die fast while long swell carries.
+  float vAvg=(L.g+R.g+U.g+D.g)*0.25;
+  nv-=(nv-vAvg)*visc;
+
+  // Breaking. Viscosity damps every wave by the same fraction whatever its
+  // shape, which is the wrong mechanism: real waves die by steepening until the
+  // face collapses, while a gentle swell alongside carries on untouched. So past
+  // a slope threshold, bleed velocity in proportion to the excess.
+  float gx=(R.r-L.r)*0.5, gy=(D.r-U.r)*0.5;
+  float sq=gx*gx+gy*gy;
+  // Clamped at half: this is the only nonlinear term in the scheme, and an
+  // unbounded state-dependent subtraction can outrun the CFL limit.
+  if(sq>brkAt) nv*=1.0-min(0.5,(sq-brkAt)*brkRate);
+
+  float nh=h+nv;
+
+  // Absorbing skirts at both y edges, so waves LEAVE instead of bouncing. A
+  // reflecting far edge makes the field ring like a pool: returning waves stand
+  // against incoming ones and whole rows heave in unison.
+  float f=1.0;
+  if(uv.y<skirtT)       f*=0.5+0.5*(uv.y/skirtT);
+  if(1.0-uv.y<skirtB)   f*=0.5+0.5*((1.0-uv.y)/skirtB);
+
+  gl_FragColor=vec4(nh*f, nv*f, 0., 1.);
+}`;
+
+// Line tessellation. Each segment becomes two triangles; a.z picks which side of
+// the centreline this vertex sits on. Canvas2D's stroke() does this for free,
+// and doing it by hand is the one genuinely fiddly part of the port.
+const VS_LINE=`
+precision highp float;
+attribute vec3 a;                 // x = line index, y = column, z = corner (-1/+1)
+uniform sampler2D sim;
+uniform vec2 res;
+uniform float N, M, step, hz, persp, amp, ampNear;
+uniform float simGain, simH, fetch, skirt, lineW, widthNear;
+uniform float slopeLit, litRange, litGamma, floorLit, crestGain;
+uniform float beam, beamWidth, beamSoft, beamLift, beamPhase, beamOn;
+uniform vec2 lampP;
+uniform float guard;
+uniform vec4 guardBox;   // x0,y0,x1,y1 in CSS px
+uniform float glowW;                 // 0 for the core pass, >0 for the glow pass
+varying float vNear;
+varying float vLit;                  // 0..1 shading, before colour
+varying float vWarm;                 // 0..1 how much beam this vertex catches
+varying float vEdge;                 // -1..1 across the line, for edge fade
+varying float vHalf;                 // half width in device px
+varying float vCov;                  // <1 when the line is sub-pixel
+
+float rowU(float i){ return (i+0.5)/N; }
+
+// Grid position for a line/column, shared by the point and its slope taps so the
+// two cannot drift apart.
+vec2 gridAt(float i, float j){
+  float u=rowU(i);
+  float gy=fetch + pow(u,persp)*(simH-1.0-skirt-fetch);
+  float x=-40.0 + j*step;
+  return vec2(fract(x/res.x), gy/simH);
+}
+float hAt(vec2 g){ return texture2D(sim,g).r; }
+
+vec2 pointAt(float i, float j){
+  float u=rowU(i);
+  // Rows are spaced by a power law, so they crowd toward the horizon the way a
+  // receding plane does.
+  float y0=hz + (res.y-hz)*pow(u,persp);
+  float near=pow(u,1.25);
+  // Sample BELOW the fetch band: those rows are simulated but never drawn, so
+  // waves arrive already formed instead of materialising mid-scene.
+  float x=-40.0 + j*step;
+  float hgt=hAt(gridAt(i,j))*simGain;
+  float a2=(res.y-hz)*amp*(0.06+near*ampNear);
+  return vec2(x, y0 - hgt*a2);
+}
+
+void main(){
+  vec2 p0=pointAt(a.x,a.y);
+  vec2 p1=pointAt(a.x,min(a.y+1.0,M-1.0));
+  vec2 dir=normalize(p1-p0+vec2(1e-6,0.));
+  vec2 nrm=vec2(-dir.y,dir.x);
+  float near=pow(rowU(a.x),1.25);
+  vNear=near;
+
+  // ---- shading ----
+  // Slope along the line and across it, straight from the field. On the CPU this
+  // needed an explicit low-pass over several taps to stop it speckling; here the
+  // texture sample is already bilinear across a grid coarser than the point
+  // spacing, which does the smoothing for free.
+  vec2 g=gridAt(a.x,a.y);
+  float hC=hAt(g);
+  float dX=hAt(gridAt(a.x,a.y+1.0))-hAt(gridAt(a.x,a.y-1.0));
+  float dY=hAt(g+vec2(0.,1.5/simH))-hAt(g-vec2(0.,1.5/simH));
+
+  // Height term: bright at the crest. Slope term: bright on the flank facing up.
+  float litH=clamp(hC*simGain*0.5+0.5, 0.0, 1.0);
+  float litS=clamp(-dY*simGain*6.0+0.5, 0.0, 1.0);
+  float lit=mix(litH, litS, slopeLit);
+
+  // Sharpest crests get extra gain, which is what reads as the glint on a
+  // breaking face rather than a uniformly brighter wave.
+  float sharp=clamp(abs(dX)*simGain*4.0, 0.0, 1.0);
+  lit*= 1.0 + (crestGain-1.0)*sharp;
+
+  lit=pow(clamp(lit/max(0.02,litRange),0.0,1.0), litGamma);
+  vLit=floorLit+(1.0-floorLit)*lit;
+
+  // ---- the light ----
+  // How much of the beam this vertex catches. The cone is angular around the
+  // lamp, so the lit patch spreads with distance the way a real beam does
+  // instead of staying a fixed width on screen.
+  // The lamp is a screen point now, not a fraction: with the headland on it rides
+  // the top of the tower, so the glare path converges on the light you can see.
+  float ang=atan(p0.x-lampP.x, max(1.0,p0.y-lampP.y));
+  float d=abs(ang-beamPhase);
+  float edge=beamWidth*max(0.001,beamSoft);
+  float cone=1.0-smoothstep(beamWidth-edge, beamWidth+edge, d);
+
+  // Masthead guard. A moving bright wedge under body copy is the one thing here
+  // that actually hurts readability, so the cone is held back inside the box and
+  // feathered out over a margin -- a hard cutoff would read as a rectangle.
+  if(guard>0.0 && guardBox.z>guardBox.x){
+    float fx=90.0, fy=70.0;
+    float sx = p0.x<guardBox.x ? (guardBox.x-p0.x)/fx
+             : p0.x>guardBox.z ? (p0.x-guardBox.z)/fx : 0.0;
+    float sy = p0.y>guardBox.w ? (p0.y-guardBox.w)/fy : 0.0;
+    float away=min(1.0, max(sx,sy));
+    cone*= away+(1.0-away)*(1.0-guard);
+  }
+  // A crest tilted toward the lamp throws light back; a trough does not. This is
+  // the specular term, and it is why lit water reads as wet rather than painted.
+  float facing=clamp(-dY*simGain*6.0, 0.0, 1.0);
+  vWarm=beam*beamOn*cone*(0.35+beamLift*facing)*near;
+
+  // Near lines are drawn wider so they read as closer. This multiplies the base
+  // width, so the two compound: at width 1 and DPR 2 a foreground line is already
+  // 2*(0.5+1.5)=4 device px, which is what clogs the near field.
+  float w=lineW*(0.5+near*widthNear)*0.5+glowW;
+  // Carry the across-line position and the half width so the fragment stage can
+  // fade the edges. MSAA does not help here: it antialiases where triangles meet,
+  // and a line's long edges are the silhouette of a single quad, so without this
+  // every line has hard stair-stepped sides. Canvas stroke() did this for free.
+  vEdge=a.z;
+  // A line thinner than one device pixel cannot be drawn thinner -- it can only
+  // be drawn fainter. Below that floor the quad is held at a pixel and the lost
+  // width is carried into alpha, which is what keeps far lines continuous
+  // instead of breaking into a dashed shimmer as they thin.
+  float wMin=0.5;
+  vHalf=max(w, wMin);
+  vCov=min(1.0, w/wMin);
+  vec2 p=p0+nrm*a.z*vHalf;
+  gl_Position=vec4(p.x/res.x*2.0-1.0, 1.0-p.y/res.y*2.0, 0., 1.);
+}`;
+
+const FS_LINE=`
+precision highp float;
+varying float vNear;
+varying float vLit;
+varying float vWarm;
+varying float vEdge;
+varying float vHalf;
+varying float vCov;
+uniform float dimFar, bright, beamWarm, beamSat, alphaMul;
+void main(){
+  float a=(dimFar+(1.0-dimFar)*vNear)*bright*vLit;
+
+  // Edge falloff, one device pixel wide. vEdge runs -1..1 across the line, so the
+  // distance from the edge in pixels is (1-|vEdge|)*vHalf. The fade is applied
+  // relative to the line's own width, not as a flat clamp: a flat clamp dims the
+  // whole line whenever the half-width is under a pixel, which is most of them.
+  float dpx=(1.0-abs(vEdge))*vHalf;
+  a*=clamp(dpx, 0.0, 1.0) * vCov;
+
+  vec3 cool=vec3(0.56,0.71,0.85);
+  // Amber, desaturated toward warm-white by beamSat. Full-saturation amber on
+  // water reads as a sunset; the lamp wants to look like a light, not a colour.
+  vec3 amber=mix(vec3(1.0,0.96,0.90), vec3(0.93,0.77,0.59), beamSat);
+  float w=clamp(vWarm*beamWarm,0.0,1.0);
+  vec3 col=mix(cool, amber, w);
+
+  // The beam adds light rather than only recolouring: lit water is brighter than
+  // unlit water, which is the whole point of a lighthouse.
+  a*=1.0+vWarm*1.6;
+
+  a*=alphaMul;
+  gl_FragColor=vec4(col*a, a);
+}`;
+
+// Flat shaded geometry: the headland, the tower, the lantern, the halo. Position
+// in CSS px, colour per vertex. One program covers all four because the only thing
+// they need is "fill this triangle with this colour" -- the rim gradient and the
+// halo falloff are vertex colours interpolated across the fan.
+const VS_SOLID=`
+attribute vec2 p;
+attribute vec4 c;
+uniform vec2 res;
+varying vec4 vc;
+void main(){
+  vc=c;
+  gl_Position=vec4(p.x/res.x*2.0-1.0, 1.0-p.y/res.y*2.0, 0., 1.);
+}`;
+
+const FS_SOLID=`
+precision mediump float;
+varying vec4 vc;
+uniform float mul;
+void main(){ gl_FragColor=vec4(vc.rgb*vc.a*mul, vc.a*mul); }`;
+
+const pSim=prog(VS_QUAD,FS_SIM);
+const pLine=prog(VS_LINE,FS_LINE);
+const pSolid=prog(VS_SOLID,FS_SOLID);
+
+// ------------------------------------------------------------- sim state ---
+const GW=P.simW, GH=P.simH;
+
+function mkTex(){
+  const t=gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D,t);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,GW,GH,0,gl.RGBA,gl.FLOAT,null);
+  // NEAREST: the sim reads its own neighbours at exactly +/-1 texel, and LINEAR
+  // would return interpolated values -- a low-pass applied every single step.
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  // CLAMP on both axes; x wrapping is done with fract() in the shader. See the
+  // NPOT note in FS_SIM -- REPEAT here makes the texture incomplete and it reads
+  // as solid black with no error reported.
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  return t;
+}
+let texA=mkTex(), texB=mkTex();
+const fbo=gl.createFramebuffer();
+
+gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texA,0);
+if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)
+  throw new Error('Float textures are not renderable on this GPU. The sim writes '+
+    'to a float framebuffer each step; without it the water cannot run.');
+gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+
+// Clear both to zero -- flat calm at t=0.
+for(const t of [texA,texB]){
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,t,0);
+  gl.viewport(0,0,GW,GH); gl.clearColor(0,0,0,1); gl.clear(gl.COLOR_BUFFER_BIT);
+}
+gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+
+const QUAD=gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER,QUAD);
+gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+
+function simStep(){
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texB,0);
+  gl.viewport(0,0,GW,GH);
+  gl.useProgram(pSim); gl.disable(gl.BLEND);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,texA);
+  const U=n=>gl.getUniformLocation(pSim,n);
+  gl.uniform1i(U('src'),0);
+  gl.uniform2f(U('texel'),1/GW,1/GH);
+  gl.uniform1f(U('stiff'),Math.min(1.95,Math.max(0,P.stiff)));
+  gl.uniform1f(U('damp'),1-Math.max(0,P.damp)*0.02);
+  gl.uniform1f(U('visc'),Math.max(0,P.visc)*0.25);
+  gl.uniform1f(U('brkAt'),Math.max(0,P.breakAt));
+  gl.uniform1f(U('brkRate'),Math.max(0,P.breakRate));
+  gl.uniform1f(U('skirtT'),Math.max(1,P.hzSkirt)/GH);
+  gl.uniform1f(U('skirtB'),Math.max(1,P.skirt)/GH);
+  gl.bindBuffer(gl.ARRAY_BUFFER,QUAD);
+  const l=gl.getAttribLocation(pSim,'p');
+  gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l,2,gl.FLOAT,false,0,0);
+  gl.drawArrays(gl.TRIANGLE_STRIP,0,4);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  const t=texA; texA=texB; texB=t;          // ping-pong
+}
+
+// ------------------------------------------------------------ gusts (CPU) ---
+// Kept on the CPU deliberately: ~34 stamps a second over a ~35x35 footprint is
+// negligible work, and it needs the random draws and branching that the tuned
+// two-train forcing in water.js depends on. Each gust is read back, stamped, and
+// uploaded -- the readback is the cost, so gusts are batched into one per frame.
+let gustSeed=12345, gustAcc=0;
+function grnd(){
+  gustSeed^=gustSeed<<13; gustSeed>>>=0;
+  gustSeed^=gustSeed>>17;
+  gustSeed^=gustSeed<<5;  gustSeed>>>=0;
+  return gustSeed/4294967296;
+}
+
+const GBUF=new Float32Array(GW*GH*4);
+let gustDirty=false;
+
+function readSim(){
+  gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texA,0);
+  gl.readPixels(0,0,GW,GH,gl.RGBA,gl.FLOAT,GBUF);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+}
+function writeSim(){
+  gl.bindTexture(gl.TEXTURE_2D,texA);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,GW,GH,0,gl.RGBA,gl.FLOAT,GBUF);
+}
+
+// water.js simGust(), unchanged in substance: two swell trains, elongated along
+// the crest, launched already moving downwind.
+// Slow weather. Two incommensurate sines rather than one: a single sine is a
+// metronome and the eye finds the period within a couple of cycles, whereas two
+// that never line up read as weather that happens to be doing something. Cheap
+// enough that there is no reason to reach for real noise.
+let wxT=0;
+function weatherAt(){
+  const w=P.weather;
+  // Centred on 1, so 'weather' only sets the depth of the swing and the mean
+  // wind strength stays whatever the wind slider says.
+  const a=Math.sin(wxT*TAU*P.weatherRate);
+  const b=Math.sin(wxT*TAU*P.weatherRate*0.37+1.7);
+  const gustMul=1+w*(a*0.65+b*0.35);
+  // Heading wanders on its own, slower clock: wind shifts direction over minutes,
+  // not with each gust, and tying it to the strength cycle would make the two
+  // move together in a way real wind does not.
+  const veer=P.veer*Math.sin(wxT*TAU*P.veerRate+0.9);
+  return {gustMul:Math.max(0,gustMul), veer};
+}
+
+function gust(){
+  const w=GW, hh=GH, B=GBUF;
+  const WX=weatherAt();
+  // Lulls thin the field out. Without this the gust RATE is constant even when
+  // strength dips, so a calm spell still gets the same dense stipple of tiny
+  // gusts and reads as uniform texture rather than as calm.
+  if(P.lull>0 && grnd() < P.lull*(1-Math.min(1,WX.gustMul))) { return; }
+  const second = grnd() < P.swell2;
+  const base = second ? P.windDir + P.swell2Ang : P.windDir;
+  const th = base + WX.veer + (grnd()-0.5)*2*P.windSpread;
+  const cx=grnd()*w|0;
+  const cy=(P.hzSkirt|0)+1+grnd()*Math.max(1,P.fetch)|0;
+  const gs = P.gustSize * (second ? P.swell2Len : 1);
+  const fp = P.gustSize;
+  const along =Math.max(3,fp*0.9);
+  const across=Math.max(3,fp*2.2*(second?P.swell2Crest:1));
+  // Per-gust jitter on top of the slow cycle. Uniform gusts give a field with one
+  // characteristic wave height; varying them is what produces the occasional
+  // larger set among smaller ones.
+  const jit=1+(grnd()-0.5)*2*P.gustVary;
+  const ph=grnd()*TAU;
+  const str=P.wind*0.10*(second?P.swell2Amp:1)*WX.gustMul*Math.max(0,jit);
+  const kk=2*Math.PI/Math.max(2,gs*0.9);
+  const ct=Math.cos(th), st=Math.sin(th);
+  const R=Math.ceil(Math.max(along,across));
+  for(let dy=-R;dy<=R;dy++){
+    const y=cy+dy; if(y<1||y>=hh-1) continue;
+    for(let dx=-R;dx<=R;dx++){
+      const u  =  dx*ct + dy*st;
+      const vv = -dx*st + dy*ct;
+      const d=Math.hypot(u/along, vv/across);
+      if(d>=1) continue;
+      const x=((cx+dx)%w+w)%w;
+      const env=str*(0.5+0.5*Math.cos(d*Math.PI));
+      const i=(y*w+x)*4;
+      // Velocity set in quadrature with height (v = -c dh/du): the pair
+      // reinforces downwind and cancels upwind, so the gust launches ONE way
+      // instead of collapsing and radiating back toward the horizon.
+      B[i]  +=Math.sin(u*kk+ph)*env;
+      B[i+1]-=Math.cos(u*kk+ph)*env*kk*P.gustDir;
+    }
+  }
+  gustDirty=true;
+}
+
+// Runaway backstop. The CFL clamp keeps the scheme stable, but a big enough wind
+// on a small enough grid can pump energy in faster than the skirts remove it,
+// and an unbounded field renders as a white screen. Checked rarely -- every
+// frame would cost more than the sim -- and scaled back rather than cleared, so
+// the surface sags instead of blinking out.
+let simTick=0;
+function backstop(){
+  if((++simTick)%30) return;
+  readSim();
+  let e=0, n=0;
+  for(let i=0;i<GW*GH;i+=7){ const v=GBUF[i*4]; e+=v*v; n++; }
+  const rms=Math.sqrt(e/n);
+  if(!isFinite(rms) || rms>3){
+    const f=isFinite(rms)?3/rms:0;
+    for(let i=0;i<GW*GH;i++){ GBUF[i*4]*=f; GBUF[i*4+1]*=f; }
+    writeSim();
+  }
+}
+
+// ------------------------------------------------------------- line mesh ---
+let LBUF=gl.createBuffer(), LCOUNT=0, M=0;
+function buildLines(){
+  M=Math.ceil((W+80)/P.ptStep)+1;
+  // Sliders hand back floats; the mesh loops need whole rows.
+  const N=Math.max(1,Math.round(P.lines)), segs=(M-1)*N;
+  const arr=new Float32Array(segs*6*3);
+  let k=0;
+  for(let i=0;i<N;i++) for(let j=0;j<M-1;j++){
+    // Two triangles per segment: (j,-1) (j,+1) (j+1,-1) / (j+1,-1) (j,+1) (j+1,+1)
+    arr[k++]=i;arr[k++]=j;  arr[k++]=-1;
+    arr[k++]=i;arr[k++]=j;  arr[k++]= 1;
+    arr[k++]=i;arr[k++]=j+1;arr[k++]=-1;
+    arr[k++]=i;arr[k++]=j+1;arr[k++]=-1;
+    arr[k++]=i;arr[k++]=j;  arr[k++]= 1;
+    arr[k++]=i;arr[k++]=j+1;arr[k++]= 1;
+  }
+  gl.bindBuffer(gl.ARRAY_BUFFER,LBUF);
+  gl.bufferData(gl.ARRAY_BUFFER,arr,gl.STATIC_DRAW);
+  LCOUNT=segs*6;
+}
+
+// ------------------------------------------------------------ lighthouse ---
+// Where the lamp and the rock sit this frame. Recomputed on fit() rather than per
+// frame: nothing here moves unless the window does.
+const CLIFF={on:0, x:0, top:0, base:0, lampX:0, lampY:0, tw:0};
+
+// Deterministic jitter, so the rock is steady frame to frame. A fresh
+// Math.random() per vertex would make the silhouette boil.
+function rk(i){ const v=Math.sin(i*12.9898+P.seed*3.71)*43758.5453; return v-Math.floor(v); }
+
+// The seaward outline of the headland, in CSS px, left to right. Shared by the
+// fill and the rim so they cannot drift apart.
+function cliffEdge(){
+  const x0=CLIFF.x, top=CLIFF.top, base=CLIFF.base, span=W-x0, rough=P.cliffRough;
+  const pts=[];
+  // Face: a steep scarp, not a dome. Nearly vertical for most of the rise so the
+  // top arrives as a defined shoulder -- that break is what reads as a mesa. A
+  // gentler curve here rounds it into a hill.
+  const FN=9;
+  for(let i=0;i<=FN;i++){
+    const u=i/FN;
+    // Batter: the face leans back as it rises, jittered along its whole length
+    // rather than only near the top, so it reads as broken rock not a cut edge.
+    const x=x0+span*(0.16*u)+span*0.030*rough*(rk(i)-0.5);
+    const y=base+(top-base)*Math.pow(u,0.40)+(base-top)*0.055*rough*(rk(i+40)-0.5);
+    pts.push(x,y);
+  }
+  // Mesa top: flat, tilting very slightly inland, with small breaks only.
+  const TN=6;
+  for(let i=0;i<=TN;i++){
+    const u=i/TN;
+    const x=x0+span*(0.16+0.84*u);
+    const y=top-(base-top)*0.03*u+(base-top)*0.022*rough*rk(i+90);
+    pts.push(x,y);
+  }
+  pts.push(W, top-(base-top)*0.03);
+  return pts;
+}
+
+let SBUF=gl.createBuffer(), SCOUNT=0, SOLID_OPAQUE=0;
+// The sky is a background, so it draws before the water rather than with the
+// rock. Its own buffer, rebuilt with everything else on fit().
+let SKYBUF=gl.createBuffer(), SKYCOUNT=0;
+let SARR=new Float32Array(0);
+// Vertices whose colour changes with the sweep, so the frame can rewrite just
+// those alphas instead of rebuilding the whole buffer.
+let RIM_AT=[], GLASS_AT=[], HALO_AT=[];
+
+function push(A,k,x,y,r,g,b,a){ A[k]=x;A[k+1]=y;A[k+2]=r;A[k+3]=g;A[k+4]=b;A[k+5]=a; return k+6; }
+function tri(A,k,ax,ay,bx,by,cx,cy,col){
+  k=push(A,k,ax,ay,col[0],col[1],col[2],col[3]);
+  k=push(A,k,bx,by,col[0],col[1],col[2],col[3]);
+  return push(A,k,cx,cy,col[0],col[1],col[2],col[3]);
+}
+function quad(A,k,x,y,w,h,col){
+  k=tri(A,k,x,y,x+w,y,x,y+h,col);
+  return tri(A,k,x+w,y,x+w,y+h,x,y+h,col);
+}
+
+function buildCliff(){
+  CLIFF.on = P.cliff>0 && P.cliffH>0;
+  const hz=horizonY();
+  if(!CLIFF.on){
+    // Open water: the lamp floats just above the horizon at lampX.
+    CLIFF.lampX=W*P.lampX; CLIFF.lampY=hz-2;
+  }
   if(CLIFF.on){
+    CLIFF.x=W*P.cliffX;
+    CLIFF.base=hz+H*0.012;
     CLIFF.top=hz-H*P.cliffH;
     CLIFF.lampX=CLIFF.x+(W-CLIFF.x)*0.42;
     CLIFF.lampY=CLIFF.top-H*P.towerH;
-    lampX=CLIFF.lampX; lampY=CLIFF.lampY;
-  } else { lampX=W*P.lampX; lampY=hz-2; }
-  // Masthead guard box, in CSS px, refreshed each frame so it tracks layout.
-  // Read from the DOM rather than hardcoded: the copy is clamp()-positioned and
-  // its height changes with wrapping, so a fixed rect would drift.
-  if(P.beamGuard>0){
-    const ce=document.querySelector('.copy, .masthead');
-    if(ce){const r=ce.getBoundingClientRect();
-      GUARD.on=1; GUARD.x0=r.left; GUARD.x1=r.right; GUARD.y1=r.bottom;
-    } else GUARD.on=0;
-  } else GUARD.on=0;
-
-  BEAM.lx=lampX;
-  BEAM.elev=0.12+(CLIFF.on?(P.cliffH+P.towerH)*1.1:0);
-
-  g.fillStyle='#070A10';g.fillRect(0,0,W,H);
-  const sky=grad('sky',hz,()=>{
-    const q=g.createLinearGradient(0,0,0,hz);
-    q.addColorStop(0,'#080C14');q.addColorStop(1,'#0E1620');return q;});
-  g.fillStyle=sky;g.fillRect(0,0,W,hz);
-  if(P.beam>0 && P.beamHaze>0){
-    // Only a halo at the source -- no shaft. In clear air the beam is invisible
-    // from the side and shows only where it lands; the solid cone-in-the-sky is
-    // a fog effect, and drawing it is what makes stylised lighthouses read as
-    // cartoons. Brightens while sweeping, never fully dark.
-    const pulse=0.30+0.70*(BEAM.on?1:0);
-    const rr=Math.max(8,W*0.075*P.beamHaze);
-    const gl=grad('halo',lampX+'|'+lampY+'|'+rr+'|'+pulse+'|'+P.beamHaze,()=>{
-      const q=g.createRadialGradient(lampX,lampY,0,lampX,lampY,rr);
-      q.addColorStop(0,'rgba(240,169,76,'+(0.34*pulse*P.beamHaze).toFixed(3)+')');
-      q.addColorStop(.45,'rgba(240,169,76,'+(0.10*pulse*P.beamHaze).toFixed(3)+')');
-      q.addColorStop(1,'rgba(240,169,76,0)');return q;});
-    g.fillStyle=gl;g.fillRect(lampX-rr,lampY-rr,rr*2,rr*2);
-    g.fillStyle='rgba(255,214,150,'+(0.55*pulse).toFixed(3)+')';
-    g.beginPath();g.arc(lampX,lampY,Math.max(1,W*0.0022),0,TAU);g.fill();
-  }
-  const sea=grad('sea',hz+'|'+H,()=>{
-    const q=g.createLinearGradient(0,hz,0,H);
-    q.addColorStop(0,'#0A121C');q.addColorStop(1,'#070A10');return q;});
-  g.fillStyle=sea;g.fillRect(0,hz,W,H-hz);
-
-  if(BARE===1){                       // gradients and lamp, no water at all
-    bareReport(fps,0);
-    if(WATER.onFrame) WATER.onFrame(fps,0,DPR);
-    requestAnimationFrame(tick); return;
+    CLIFF.tw=Math.max(3,W*P.towerW);
   }
 
-  g.globalCompositeOperation='lighter';
-  g.lineCap='round';
+  const HN=22;                       // halo fan segments
+  const cap=(120+HN+8)*3*6;   // rock fan + rim + tower + foot haze + halo
+  if(SARR.length<cap) SARR=new Float32Array(cap);
+  const A=SARR; let k=0;
+  RIM_AT=[]; GLASS_AT=[]; HALO_AT=[]; SOLID_OPAQUE=0;
 
-  // x wavenumber: waveLen is a fraction of the viewport, so kx = 2pi / (len*W)
-  const kx=TAU/Math.max(1,P.waveLen*W);
-
-  // Advance the water on a FIXED timestep, decoupled from the display rate.
-  // The wave equation is only stable for a given step size, so feeding it a
-  // variable dt would make the surface behave differently on a 60Hz and a
-  // 120Hz screen -- and blow up on a slow frame. Capped so a background tab
-  // returning after a stall catches up over a few frames instead of running
-  // hundreds of steps in one.
-  const gw2=Math.max(32,P.simW|0), gh2=Math.max(24,P.simH|0);
-  if(!SIM.h || SIM.W!==gw2 || SIM.H!==gh2) simInit(gw2,gh2);
-  if(!WATER.paused){
-    SIM.acc=Math.min(SIM.acc+dt, 0.25);
-    // Wave speed. The scheme's speed is fixed by its stiffness, which is pinned
-    // near the CFL limit for stability -- so the only honest way to slow the
-    // water is to advance it through less simulated time per real second.
-    // Measured at speed 1.0 a crest crossed the whole field in 2.8s, which
-    // reads as a puddle in a hurry; real swell at this framing takes 10-20s.
-    const fixed=(1/120)/Math.max(.05,P.speed);
-    let n=0;
-    while(SIM.acc>=fixed && n<12){
-      simStep();
-      gustAcc+=(1/120)*P.gustRate;   // gusts stay on the real-time clock
-      while(gustAcc>=1){ simGust(); gustAcc-=1; }
-      SIM.acc-=fixed; n++;
-    }
-  }
-  if(BARE===2){                       // sim runs, nothing reads it
-    g.globalCompositeOperation='source-over';
-    bareReport(fps,0);
-    if(WATER.onFrame) WATER.onFrame(fps,0,DPR);
-    requestAnimationFrame(tick); return;
-  }
-
-  const R=lineRandom(N,P.seed|0,P.randScale,P.randOct|0);
-
-  // ---- pass 1: build every line -----------------------------------------
-  // Every line is built before any is drawn, so the draw pass can run far-to-near
-  // and let nearer ropes occlude the ones behind. One shared x grid across every
-  // line, so point j of line i sits directly in front of point j of line i+1.
-  // Point spacing widens on large viewports. Cost is linear in width, so a 2560
-  // window was paying 2.7x a 900 one for the same scene -- and a wide display is
-  // exactly where the frame budget is already tightest. Above the reference
-  // width, spacing grows with sqrt(W/ref): 2560 lands at 75% of the linear point
-  // count, 3440 at 65%, while anything at or below the reference is untouched.
-  // Still monotonic, so a bigger screen never renders coarser in absolute terms.
-  const wScale=P.ptScale>0?Math.max(1,Math.sqrt(W/Math.max(320,P.ptRef))):1;
-  // ...and again by what the machine can actually keep up with. A default tuned
-  // on a fast box still crawls on a slow one, and a sea running at 20fps is worse
-  // than no sea. quality falls until frames land in budget; see adaptQuality.
-  const step=Math.max(1,P.ptStep*wScale*quality), M=Math.ceil((W+80)/step)+1;
-  WATER.step=step; WATER.pts=M*N; WATER.quality=quality; WATER.glowFade=glowFade;
-  scratch(N*M,M);
-  const PY_=SCR.py, PX_=SCR.px;
-  // x is shared by every line -- point j sits at the same x on all of them --
-  // so it is computed once here instead of N times inside the draw loop.
-  for(let j=0;j<M;j++) PX_[j]=-40+j*step;
-  const baseY=new Float64Array(N), ampA=new Float64Array(N), nearA=new Float64Array(N);
-  const kxA=new Float64Array(N);   // per-line wavenumber, needed by the foam test in pass 3
-
-  for(let i=0;i<N;i++){
-    const u=i/(N-1);
-    const y0=rowY(i,N,hz);
-    const near=Math.pow(u,1.25);
-
-    // Chop drives where this line reads its randomness. Lines sitting in a
-    // chop crest sample the noise further along than lines in a trough, so
-    // the disorder itself travels front-to-back: bands of the field go choppy
-    // and then settle. Because it moves the sampling POSITION rather than
-    // adding another displacement, it does not compete with the rope's own
-    // randomness for the same visual channel the way the old ripple height did.
-    const yDepth0=1-u;
-
-    // The sampling position DRIFTS rather than oscillating, and it drifts slowly.
-    // A sin() here swept the read head forward and back, so the surface replayed
-    // its own randomness in reverse on every return stroke. Marching it forward
-    // fixed the reversals but not the stutter: at the obvious rate the head
-    // scanned a whole noise anchor every tenth of a second, faster than the eye
-    // integrates. The 0.12 is measured — at that rate a tracked point reverses
-    // direction 4 times in 240 frames, the same floor as the plain swing with
-    // all randomness off, while still travelling further than the swing alone.
-    const fi=i + (yDepth0*TAU/Math.max(.02,P.chopLen))*P.chopAmt*P.randScale*0.16
-               + t*P.chopRate*P.chopAmt*P.randScale*0.12;
-
-    const rAmp=sampleN(R.amp,fi), rLen=sampleN(R.len,fi);
-
-    const amp=(H-hz)*P.amp*(0.06+near*P.ampNear)
-              *(1+rAmp*P.ropeRand*0.45);
-    baseY[i]=y0; ampA[i]=amp; nearA[i]=near;
-
-    const yDepth=1-u;
-    const kxi = kx*(1+rLen*P.ropeRand*0.35);
-    kxA[i]=kxi;
-    // This line's row in the height field. Perspective squashes the far rows
-    // on screen, and they should sample the water the same way: u^persp maps
-    // screen row to true depth, so the far ropes really are further out on the
-    // water rather than just drawn smaller.
-    const gy=P.fetch + Math.pow(u,P.persp)*(SIM.H-1-P.skirt-P.fetch)*P.simDepth
-             + (1-P.simDepth)*u*(SIM.H-1-P.skirt-P.fetch);
-    // How many grid cells of depth this row spans: d(gy)/di. Near the horizon
-    // u^persp is nearly flat so this is large; in front it approaches a cell.
-    const uN=Math.min(1,(i+1)/(N-1));
-    const gyN=P.fetch + Math.pow(uN,P.persp)*(SIM.H-1-P.skirt-P.fetch)*P.simDepth
-              + (1-P.simDepth)*uN*(SIM.H-1-P.skirt-P.fetch);
-    const gyW=Math.max(0.2,Math.abs(gyN-gy));
-
-    const row=i*M;
-    for(let j=0;j<M;j++){
-      const x=-40+j*step;
-      // Gerstner: shift the sample point toward the nearest crest before
-      // evaluating height. Doing it as a fixed-point iteration keeps the line
-      // single-valued -- a direct x displacement can fold the wave over itself
-      // at high steepness, which reads as tearing.
-      // Where this point sits on the water, in grid cells. x wraps with the
-      // simulation; y is the line's true distance into the scene, so the rows
-      // sample the field with the same perspective compression they are drawn
-      // with -- far ropes read a thin sliver of water, near ropes a wide one.
-      const gx=(x/W)*SIM.W*P.simTile;
-      // Gerstner, now warping the SAMPLE POSITION on a simulated surface rather
-      // than the phase of a sine. Same purpose: the linear wave equation has
-      // symmetric crests and real water does not. Fixed-point so the line stays
-      // single-valued instead of folding over at high steepness.
-      let sx=gx;
-      if(P.steep>0){
-        const s0=gx;
-        const gi=P.gerstner|0;
-        for(let q=0;q<gi;q++) sx=s0+P.steep*3.0*simAtBox(sx,gy,gyW)*P.simGain;
-      }
-      let z=simAtBox(sx,gy,gyW)*P.simGain;
-      PY_[row+j]=y0 - z*amp;
-    }
-  }
-
-  if(BARE===3){                       // geometry computed, nothing stroked
-    g.globalCompositeOperation='source-over';
-    bareReport(fps,N);
-    if(WATER.onFrame) WATER.onFrame(fps,N,DPR);
-    requestAnimationFrame(tick); return;
-  }
-
-  // ---- pass 3: draw ------------------------------------------------------
-  // Buckets are GLOBAL, not per line. They used to be allocated inside this
-  // loop, so the batching only ever grouped a single line's segments: 120 lines
-  // x ~8 occupied bands x 2 strokes came to ~1980 stroke() calls per frame
-  // rather than the few hundred the banding exists to achieve. Compositing is
-  // 'lighter' and therefore order-independent, so segments from different lines
-  // can share one path. lineWidth varies per line, so it becomes a third bucket
-  // axis quantised into WSTEPS, and alpha folds into the band index because
-  // `base` is per-line as well.
-  // Width is a bucket axis, so it multiplies the stroke count directly: at 6
-  // steps a 41-band field costs 246 buckets rather than 41. The visible spread
-  // is about 1.5px of line width across the whole field, so 2 steps carries the
-  // near/far weight difference and the rest was paying 3x for nothing.
-  const BANDS=P.bands|0, WSTEPS=Math.max(1,P.wSteps|0);
-  const NBUCK=BANDS*TINTS*WSTEPS;
-  if(!DRAW.buf || DRAW.n!==NBUCK){
-    DRAW.buf=[]; for(let q=0;q<NBUCK;q++)DRAW.buf.push([]); DRAW.n=NBUCK;
-  } else {
-    for(let q=0;q<NBUCK;q++) if(DRAW.buf[q].length) DRAW.buf[q].length=0;
-  }
-  const bucket=DRAW.buf, foamAll=[];
-  const lwLo=0.5*P.width, lwHi=2.0*P.width, lwSpan=Math.max(1e-6,lwHi-lwLo);
-  const glowMul=quality>=P.adaptMax-0.01?glowFade:1;   // dimmed only once spacing is spent
-  for(let i=0;i<N;i++){
-    const row=i*M, y0=baseY[i], amp=ampA[i], near=nearA[i], kxi=kxA[i];
-
-    // This line's y values live in PY_[row .. row+M-1]; x is shared in PX_.
-
-    // Taubin smoothing along the line itself: each point slides toward the
-    // midpoint of its two neighbours in x. Every shrinking pass (+lam) is
-    // paired with an expanding one (-mu) so repeated passes do not flatten the
-    // wave. Endpoints stay pinned so the line still spans the full width.
-    if(P.smooth>0 && P.smoothPass>0){
-      const lam=0.6*P.smooth, mu=-0.63*P.smooth, by=SCR.by;
-      const relax=f=>{
-        for(let k2=0;k2<M;k2++) by[k2]=PY_[row+k2];
-        for(let k2=1;k2<M-1;k2++) PY_[row+k2]=by[k2]+f*((by[k2-1]+by[k2+1])*0.5-by[k2]);
-      };
-      for(let q=0;q<P.smoothPass;q++){relax(lam);relax(mu);}
-    }
-
-    // Depth ramp for brightness. This used to be a hardwired 9x from horizon
-    // to front, which is why the back rows looked dim and, because you cannot
-    // see motion you cannot see, also looked FLAT -- the amplitude complaint
-    // was partly a brightness one. Real water does not dim with distance;
-    // haze is slight over a few hundred metres and a glancing angle reflects
-    // MORE sky, so distant water often reads brighter. dimFar is the fraction
-    // of near brightness the horizon keeps: 1 = no ramp at all.
-    const dim=P.dimFar+(1-P.dimFar)*near;
-    const base=0.33*dim*P.bright;
-    const lwLine=(0.5+near*1.5)*P.width;
-    const wi=Math.max(0,Math.min(WSTEPS-1,((lwLine-lwLo)/lwSpan*WSTEPS)|0));
-    // Alpha bands. Every segment in a band is stroked at ONE alpha, so this is
-    // literally colour quantization and the band count is the bit depth: at 6
-    // the whole surface had only 6 possible brightnesses, a mean error of 24%
-    // and 37%-of-base jumps between neighbours -- visible as posterized
-    // terracing once the simulated surface gave the light something detailed
-    // to fall on. The sine version hid it because its brightness varied slowly.
-    //
-    // Stroking every segment at its true alpha is the correct fix and costs 76x
-    // the path operations. Cost is LINEAR in band count though, so buying more
-    // bands is the cheap way out: 32 puts the step at ~3% of range, under what
-    // the eye picks up on a smooth gradient, for 5x the path ops on a frame
-    // that was running at twice its target.
-    // Slope is a finite difference between ADJACENT samples, so it is inherently
-    // high-frequency: every bit of grid noise lands in it at full strength. Measured
-    // along real lines, lighting from slope alone reverses direction sample-to-sample
-    // 15% of the time (mean jump 0.082 of full range); lighting from crest alone
-    // flips 4% (jump 0.017). That alternation IS the dither-looking speckle -- it is
-    // not the crest term, and not the band quantization. Low-passing slope along the
-    // line keeps its tonal range (which crest lacks: crest is hard-zero 54% of the
-    // time) while removing the flicker. slopeSmooth is the tap count; 0 disables.
-    const sm=P.slopeSmooth|0;
-    const rawSl=SCR.sl, smSl=SCR.sl2;
-    for(let j=1;j<M;j++)
-      rawSl[j]=Math.min(2.5,Math.abs(PY_[row+j]-PY_[row+j-1])/step*14);
-    if(sm>0){
-      for(let j=1;j<M;j++){
-        let acc=0,n=0;
-        for(let d=-sm;d<=sm;d++){const k=j+d; if(k>=1&&k<M){acc+=rawSl[k];n++;}}
-        smSl[j]=acc/n;
-      }
-    } else smSl.set(rawSl.subarray(0,M),0);
-    for(let j=1;j<M;j++){
-      const ax=PX_[j-1], ay=PY_[row+j-1];
-      const crest=Math.max(0,(y0-ay)/(amp+.001));
-      // |dy/dx| over the segment, low-passed along the line (see above).
-      const slope=smSl[j];
-      // scale-free: divides out this line's own amplitude and wavenumber
-      const nslope=Math.abs(PY_[row+j]-ay)/step/(amp*kxi+1e-6);
-      // Normalise the lighting into 0..1 before it becomes brightness.
-      // The old form was base*(0.65 + lit*crest), and the constant 0.65 was a
-      // floor so troughs never vanished -- but as a CONSTANT it ate 19 of the 64
-      // brightness bands before any shading happened, and lit itself only spans
-      // about 0..0.9. Measured, that left 17 bands in use, 10 of them carrying
-      // everything, all clumped between band 18 and 27: a quarter of the range,
-      // which is why the water read as "bright lines and dim lines" with nothing
-      // in between. Mapping lit through its own range and applying a gamma uses
-      // the whole scale, and `floor` stays available as a real minimum.
-      let lit=crest*(1-P.slopeLit) + slope*P.slopeLit;
-      // Lighthouse. The beam is an angular wedge in the horizontal plane: this
-      // segment's bearing is its offset from screen centre divided by its depth,
-      // so near segments need a big x offset to leave the cone and far ones a
-      // small one -- that divergence is what makes the lit patch read as a cone
-      // lying ON the water rather than a stripe painted over it.
-      let hit=0;
-      if(BEAM.on){
-        // Depth from `near` (1 = foreground): the draw pass is a separate loop
-        // from the build pass, so the build pass's yDepth is out of scope here.
-        const bd=1-near;
-        // Elevation grows with the tower: a light on a mesa throws a longer,
-        // narrower glare path than one sitting at sea level.
-        const bearing=Math.atan2((ax-BEAM.lx)/W, BEAM.elev+bd*1.6);
-        const d=Math.abs(bearing-BEAM.a);
-        const hw=Math.max(.01,P.beamWidth);
-        // Soft-edged wedge: full inside, falling to 0 across the outer `soft`.
-        const inner=hw*(1-P.beamSoft);
-        let cone=d<=inner ? 1
-                 : d>=hw ? 0
-                 : 1-(d-inner)/Math.max(1e-4,hw-inner);
-        if(cone>0){
-          if(GUARD.on){
-            // Feather over `fx` px horizontally and `fy` px above the box's
-            // bottom edge, so the beam fades out under the text instead of
-            // ending on a hard line that would read as a rectangle.
-            const fx=90, fy=70;
-            const sx=ax<GUARD.x0 ? (GUARD.x0-ax)/fx
-                   : ax>GUARD.x1 ? (ax-GUARD.x1)/fx : 0;
-            const sy=ay>GUARD.y1 ? (ay-GUARD.y1)/fy : 0;
-            const away=Math.min(1,Math.max(sx,sy));
-            cone*=away+(1-away)*(1-P.beamGuard);
-          }
-        }
-        if(cone>0){
-          hit=cone*cone;
-          // Specular: faces tilted toward the lamp bounce it at the viewer.
-          // slope is |dy/dx| smoothed, so it stands in for how far this facet is
-          // tilted out of horizontal -- crests glint, flat troughs stay dark.
-          const glint=1+P.beamLift*Math.min(1,slope*0.8);
-          lit+=P.beam*cone*cone*glint*0.45;
-        }
-      }
-      const litN=Math.min(1,Math.max(0,lit/Math.max(.01,P.litRange)));
-      const shade=Math.pow(litN,Math.max(.05,P.litGamma));
-      // crest contrast scales the SHADING against the floor, so 0 gives flat
-      // lines at the floor value and higher values open the gap between lit and
-      // unlit. It used to sit outside as *(1+P.crest) -- a flat multiplier on the
-      // whole line, which is just `bright` under another name, and with bright at
-      // 1.55 it pinned 90-100% of segments at alpha 1. One band held everything:
-      // the tonal range existed in `shade` and was then flattened against the
-      // ceiling. Keep the gain low enough that shade still has somewhere to go.
-      let al=base*Math.min(1,P.floor+(1-P.floor)*shade*P.crest);
-      if(al<0.004)continue;
-      // Dither. More bands shrink the steps but leave the boundaries in fixed
-      // places, so what is left of the terracing still runs as continuous
-      // CONTOUR LINES across the water -- the eye finds an edge far more
-      // easily than a 3% brightness difference. Jittering each segment by up
-      // to half a band converts that edge into noise: a segment near a
-      // boundary lands on either side at random, so the transition scatters
-      // instead of drawing a line. Costs one multiply and keeps the batching.
-      // Amplitude scales with dithAmt, not a fixed half-band: at 32 bands a
-      // full +/-0.5 jitter is a large fraction of the remaining error budget
-      // and shows up as speckle, and because the jitter is one-sided in
-      // aggregate it also lifts the mean brightness. 0.35 of a band clears the
-      // contours without the noise reading as grain.
-      // Band straight off the normalised shade: the whole 0..BANDS range is
-      // reachable now, instead of the 25% the old al/(base*2.2) mapping allowed.
-      // Final alpha, not per-line shade: `base` carries the depth fade, so it
-      // has to be inside the quantisation for a global bucket to be one colour.
-      const aFinal=base*2.2*(P.floor+(1-P.floor)*shade);
-      const fb=aFinal/(0.33*P.bright*2.2)*BANDS + (dith[j&63]-0.5)*P.dithAmt;
-      const bi=Math.max(0,Math.min(BANDS-1,fb|0));
-      const ti=Math.min(TINTS-1,(hit*P.beamWarm*TINTS)|0);
-      // One number per segment: the index of its first point in PY_. The
-      // second point is always the next one along the same line, so the draw
-      // pass reconstructs both ends without storing them.
-      bucket[(bi*TINTS+ti)*WSTEPS+wi].push(row+j-1);
-      if(P.foam>0 && nslope>P.foamAt) foamAll.push(row+j-1);
-    }
-
-  }
-
-  // One flush for the whole field. Empty buckets cost nothing, so the stroke
-  // count is the number of (alpha, tint, width) combinations actually present.
-  const maxA=0.33*P.bright*2.2;
-  for(let b=0;b<BANDS;b++){
-    const al=maxA*(b+0.5)/BANDS;
-    for(let ti=0;ti<TINTS;ti++){
-      const m=TINTS>1?ti/(TINTS-1):0;
-      let r=COOL[0]+(AMBER[0]-COOL[0])*m,
-          gg=COOL[1]+(AMBER[1]-COOL[1])*m,
-          bb=COOL[2]+(AMBER[2]-COOL[2])*m;
-      const sat=P.beamSat, lum=0.2126*r+0.7152*gg+0.0722*bb;
-      r=lum+(r-lum)*sat; gg=lum+(gg-lum)*sat; bb=lum+(bb-lum)*sat;
-      const col=(r|0)+','+(gg|0)+','+(bb|0);
-      for(let wq=0;wq<WSTEPS;wq++){
-        const seg=bucket[(b*TINTS+ti)*WSTEPS+wq];
-        if(!seg.length)continue;
-        const lw=lwLo+lwSpan*(wq+0.5)/WSTEPS;
-        g.beginPath();
-        for(let k2=0;k2<seg.length;k2++){const p0=seg[k2];
-          g.moveTo(PX_[p0%M],PY_[p0]);g.lineTo(PX_[(p0+1)%M],PY_[p0+1]);}
-        // The glow is a second stroke of every segment at P.glow x the width, so
-        // it costs several times the fill of the line itself. On a fill-limited
-        // machine that is the single biggest thing to give up, and it fades out
-        // rather than disappearing -- see adaptQuality.
-        if(glowMul>0.02){
-          g.strokeStyle='rgba('+col+','+(al*0.20*glowMul).toFixed(4)+')';
-          g.lineWidth=lw*P.glow;g.stroke();
-        }
-        g.strokeStyle='rgba('+col+','+Math.min(1,al).toFixed(4)+')';g.lineWidth=lw;g.stroke();
-      }
-    }
-  }
-
-  // Foam sits on top, whiter and tighter than the water beneath it.
-  if(foamAll.length){
-    g.beginPath();
-    for(let k2=0;k2<foamAll.length;k2++){const p0=foamAll[k2];
-      g.moveTo(PX_[p0%M],PY_[p0]);g.lineTo(PX_[(p0+1)%M],PY_[p0+1]);}
-    g.strokeStyle='rgba(226,240,255,'+Math.min(1,0.33*P.bright*2.2*P.foam).toFixed(4)+')';
-    g.lineWidth=(lwLo+lwSpan*0.75)*1.5; g.stroke();
-  }
-  g.globalCompositeOperation='source-over';
-
-  // --- Headland ------------------------------------------------------------
-  // Drawn last, opaque: it occludes the water by painting over it. A clip on
-  // the water pass would not work, because 'lighter' compositing means the
-  // rope lines add to whatever is beneath them rather than being hidden by it.
+  // The buffer is laid out in two blocks. The opaque one -- rock, tower, lantern
+  // cap -- draws with blending off so it occludes the water; the additive one --
+  // rim, lit glass, halo -- draws after it with the same blend the water uses.
+  // One buffer, two draw ranges, so the split costs nothing.
   if(CLIFF.on){
-    const x0=CLIFF.x, top=CLIFF.top, base=hz+H*0.012;
-    // Deterministic jitter so the rock is steady frame to frame -- a fresh
-    // Math.random() per frame would make the silhouette boil.
-    const rk=(i)=>{const v=Math.sin(i*12.9898+P.seed*3.71)*43758.5453;return v-Math.floor(v);};
-    const rough=P.cliffRough;
-
-    g.beginPath();
-    g.moveTo(W,base);
-    g.lineTo(x0,base);
-    // Face: a steep scarp, not a dome. Nearly vertical for most of the rise so
-    // the top edge arrives as a defined shoulder -- that break is what reads as
-    // a mesa. A gentler curve here rounds it into a hill.
-    const FN=9, span=(W-x0);
-    for(let i=0;i<=FN;i++){
-      const u=i/FN;
-      // Batter: the face leans back as it rises, and the jitter is applied
-      // along it rather than only near the top, so the scarp reads as broken
-      // rock instead of a cut edge.
-      const x=x0+span*(0.16*u) + span*0.030*rough*(rk(i)-0.5);
-      const y=base+(top-base)*Math.pow(u,0.40) + (base-top)*0.055*rough*(rk(i+40)-0.5);
-      g.lineTo(x,y);
+    const e=cliffEdge(), base=CLIFF.base, top=CLIFF.top;
+    // Rock value ramps with height: palest at the waterline where distance haze
+    // sits, darkest at the mesa top. That gradient is most of what makes it read
+    // as a solid body rather than a flat cutout.
+    const L=P.rockLift;
+    const rockAt=(y)=>{
+      const u=Math.min(1,Math.max(0,(y-top)/Math.max(1,base-top)));  // 0 top, 1 base
+      const h=1+P.rockHaze*u;
+      return [0.020*L*h, 0.031*L*h, 0.051*L*h, 1];
+    };
+    // Fan the outline against the bottom-right corner. The silhouette is a simple
+    // polygon anchored on the base line, so a fan from (W,base) covers it without
+    // needing a triangulator. Per-vertex colour, so the ramp interpolates.
+    for(let i=0;i<e.length/2-1;i++){
+      const c0=rockAt(base), c1=rockAt(e[i*2+1]), c2=rockAt(e[i*2+3]);
+      k=push(A,k, W,base, c0[0],c0[1],c0[2],1);
+      k=push(A,k, e[i*2],e[i*2+1], c1[0],c1[1],c1[2],1);
+      k=push(A,k, e[i*2+2],e[i*2+3], c2[0],c2[1],c2[2],1);
     }
-    // Mesa top: flat, tilting very slightly inland, with small breaks only.
-    const TN=6;
-    for(let i=0;i<=TN;i++){
-      const u=i/TN;
-      const x=x0+span*(0.16+0.84*u);
-      // Small, mostly-downward breaks: a mesa top is flat but not milled.
-      const y=top - (base-top)*0.03*u + (base-top)*0.022*rough*rk(i+90);
-      g.lineTo(x,y);
+    // Close the mesa top across to the right edge.
+    const cb=rockAt(base), ct=rockAt(top);
+    k=push(A,k, W,base, cb[0],cb[1],cb[2],1);
+    k=push(A,k, e[e.length-2],e[e.length-1], ct[0],ct[1],ct[2],1);
+    k=push(A,k, W,top-(base-top)*0.03, ct[0],ct[1],ct[2],1);
+
+    // ---- opaque block ends here; the tower is opaque too, so it comes first ----
+    const tw0=CLIFF.tw, tx0=CLIFF.lampX, ty0=CLIFF.lampY;
+    const tb0=top+(base-top)*0.16;
+    // Lighter than the rock behind it: a painted tower against dark stone is the
+    // whole silhouette, and matching the rock loses it into the mesa.
+    const TOWER=[0.031*P.rockLift*2.1, 0.047*P.rockLift*2.1, 0.071*P.rockLift*2.0, 1];
+    k=tri(A,k, tx0-tw0*0.72,tb0, tx0-tw0*0.46,ty0+tw0*0.5, tx0+tw0*0.46,ty0+tw0*0.5, TOWER);
+    k=tri(A,k, tx0-tw0*0.72,tb0, tx0+tw0*0.46,ty0+tw0*0.5, tx0+tw0*0.72,tb0, TOWER);
+    const CAP=[0.020*P.rockLift*1.5, 0.031*P.rockLift*1.5, 0.051*P.rockLift*1.5, 1];
+    // Gallery deck: a thin lip proud of the shaft, at the base of the lantern.
+    // This is the widest part of the head, which is what stops the outline
+    // reading as a chess piece -- a box narrowing to a point is a mitre.
+    const gy=ty0-tw0*0.34;
+    k=quad(A,k, tx0-tw0*0.82, gy, tw0*1.64, tw0*0.13, CAP);
+    // Lantern room: the glazed box, narrower than the deck it stands on.
+    k=quad(A,k, tx0-tw0*0.56, ty0-tw0*0.30, tw0*1.12, tw0*0.80, CAP);
+    // Cap: a shallow dome, not a spire. Three flat steps approximate the curve
+    // closely enough at this size and stay one draw call.
+    k=quad(A,k, tx0-tw0*0.62, ty0-tw0*0.44, tw0*1.24, tw0*0.14, CAP);
+    k=quad(A,k, tx0-tw0*0.48, ty0-tw0*0.56, tw0*0.96, tw0*0.12, CAP);
+    k=quad(A,k, tx0-tw0*0.28, ty0-tw0*0.65, tw0*0.56, tw0*0.09, CAP);
+    // Finial: a short mast, the one vertical the shape is allowed.
+    k=quad(A,k, tx0-tw0*0.06, ty0-tw0*0.82, tw0*0.12, tw0*0.17, CAP);
+  }
+  SOLID_OPAQUE=k/6;
+
+  if(CLIFF.on){
+    const e=cliffEdge(), base=CLIFF.base, top=CLIFF.top;
+    // Lit rim on the seaward edge: a wedge hugging the outline, bright at the
+    // face and falling to nothing inland. Vertex alpha does the falloff.
+    const RC=[0.925,0.769,0.588];
+    const inset=(W-CLIFF.x)*0.5;
+    for(let i=0;i<e.length/2-1;i++){
+      const x0=e[i*2], y0=e[i*2+1], x1=e[i*2+2], y1=e[i*2+3];
+      RIM_AT.push(k/6, k/6+1, k/6+3);   // the three on the lit edge
+      k=push(A,k,x0,y0,RC[0],RC[1],RC[2],1);
+      k=push(A,k,x1,y1,RC[0],RC[1],RC[2],1);
+      k=push(A,k,x0+inset,y0,RC[0],RC[1],RC[2],0);
+      k=push(A,k,x1,y1,RC[0],RC[1],RC[2],1);
+      k=push(A,k,x1+inset,y1,RC[0],RC[1],RC[2],0);
+      k=push(A,k,x0+inset,y0,RC[0],RC[1],RC[2],0);
     }
-    g.lineTo(W,top-(base-top)*0.03);
-    g.closePath();
-    g.fillStyle='#05080D';g.fill();
 
-    // A faint lit rim on the seaward edge, brightening while the lamp sweeps.
-    g.save();g.clip();
-    const ri=(0.05+0.09*(BEAM.on?1:0)).toFixed(3);
-    const rim=grad('rim',x0+'|'+top+'|'+base+'|'+ri,()=>{
-      const q=g.createLinearGradient(x0,top,x0+(W-x0)*0.5,base);
-      q.addColorStop(0,'rgba(236,196,150,'+ri+')');
-      q.addColorStop(1,'rgba(236,196,150,0)');return q;});
-    g.fillStyle=rim;g.fillRect(x0,top-20,W-x0,base-top+20);
-    g.restore();
+    // Waterline haze: a short band hugging the base of the cliff, fading upward.
+    // Additive, so it lifts the foot of the rock away from the sea behind it.
+    if(P.footHaze>0){
+      const fb=CLIFF.base, fh=Math.max(4,(CLIFF.base-CLIFF.top)*0.42);
+      const HC=[0.62,0.72,0.85];
+      k=push(A,k, CLIFF.x,fb,      HC[0],HC[1],HC[2],P.footHaze);
+      k=push(A,k, W,fb,            HC[0],HC[1],HC[2],P.footHaze);
+      k=push(A,k, CLIFF.x,fb-fh,   HC[0],HC[1],HC[2],0);
+      k=push(A,k, W,fb,            HC[0],HC[1],HC[2],P.footHaze);
+      k=push(A,k, W,fb-fh,         HC[0],HC[1],HC[2],0);
+      k=push(A,k, CLIFF.x,fb-fh,   HC[0],HC[1],HC[2],0);
+    }
 
-    // Tower: tapered, on the mesa, set in from the seaward edge.
-    const tw=Math.max(3,W*0.0125), ty=CLIFF.lampY, tx=CLIFF.lampX;
-    const tb=top+(base-top)*0.16;   // sunk into the rock, no visible gap
-    g.beginPath();
-    g.moveTo(tx-tw*0.72,tb);
-    g.lineTo(tx-tw*0.46,ty+tw*0.5);
-    g.lineTo(tx+tw*0.46,ty+tw*0.5);
-    g.lineTo(tx+tw*0.72,tb);
-    g.closePath();
-    g.fillStyle='#080C12';g.fill();
-    // Lantern room and cap.
-    g.fillStyle='#05080D';
-    g.fillRect(tx-tw*0.60,ty-tw*0.30,tw*1.20,tw*0.86);
-    g.beginPath();
-    g.moveTo(tx-tw*0.66,ty-tw*0.30);
-    g.lineTo(tx+tw*0.66,ty-tw*0.30);
-    g.lineTo(tx,ty-tw*1.05);
-    g.closePath();g.fill();
-    // The lit glass itself, so the source reads as a point on the structure.
-    const lg=(0.34+0.62*(BEAM.on?1:0)).toFixed(3);
-    g.fillStyle='rgba(255,222,168,'+lg+')';
-    g.fillRect(tx-tw*0.30,ty-tw*0.14,tw*0.60,tw*0.54);
+    // The lit glass, so the source reads as a point on the structure.
+    const tw=CLIFF.tw, tx=CLIFF.lampX, ty=CLIFF.lampY;
+    GLASS_AT.push(k/6,k/6+1,k/6+2,k/6+3,k/6+4,k/6+5);
+    k=quad(A,k, tx-tw*0.38, ty-tw*0.22, tw*0.76, tw*0.62, [1,0.871,0.659,1]);
   }
 
-  bareReport(fps,N);
-  if(WATER.onFrame) WATER.onFrame(fps,N,DPR);
+  // Halo around the lamp. Only a bloom at the source -- see the note on `haze`.
+  if(P.beam>0 && P.haze>0){
+    const rr=Math.max(8,W*0.075*P.haze);
+    const cx=CLIFF.lampX, cy=CLIFF.lampY;
+    for(let i=0;i<HN;i++){
+      const a0=i/HN*TAU, a1=(i+1)/HN*TAU;
+      HALO_AT.push(k/6);
+      k=push(A,k,cx,cy,0.94,0.66,0.30,0.34*P.haze);
+      k=push(A,k,cx+Math.cos(a0)*rr,cy+Math.sin(a0)*rr,0.94,0.66,0.30,0);
+      k=push(A,k,cx+Math.cos(a1)*rr,cy+Math.sin(a1)*rr,0.94,0.66,0.30,0);
+    }
+  }
+
+  SCOUNT=k/6;
+  gl.bindBuffer(gl.ARRAY_BUFFER,SBUF);
+  gl.bufferData(gl.ARRAY_BUFFER,SARR.subarray(0,k),gl.DYNAMIC_DRAW);
+
+  // Sky: a vertical ramp, lighter at the horizon than at the top, so the rock
+  // has the most contrast exactly where its outline is.
+  if(P.sky>0){
+    const g=P.sky;
+    const hi=[0.031*(1+g*0.45),0.047*(1+g*0.45),0.078*(1+g*0.45),1];
+    const lo=[0.031*(1+g*1.5), 0.055*(1+g*1.5), 0.086*(1+g*1.5), 1];
+    const S=new Float32Array(6*6); let j=0;
+    j=push(S,j,0,0,hi[0],hi[1],hi[2],1);
+    j=push(S,j,W,0,hi[0],hi[1],hi[2],1);
+    j=push(S,j,0,hz,lo[0],lo[1],lo[2],1);
+    j=push(S,j,W,0,hi[0],hi[1],hi[2],1);
+    j=push(S,j,W,hz,lo[0],lo[1],lo[2],1);
+    j=push(S,j,0,hz,lo[0],lo[1],lo[2],1);
+    gl.bindBuffer(gl.ARRAY_BUFFER,SKYBUF);
+    gl.bufferData(gl.ARRAY_BUFFER,S,gl.STATIC_DRAW);
+    SKYCOUNT=6;
+  } else SKYCOUNT=0;
+}
+
+function drawSky(){
+  if(!SKYCOUNT) return;
+  gl.useProgram(pSolid);
+  gl.uniform2f(gl.getUniformLocation(pSolid,'res'),W,H);
+  gl.uniform1f(gl.getUniformLocation(pSolid,'mul'),1);
+  gl.bindBuffer(gl.ARRAY_BUFFER,SKYBUF);
+  const pa=gl.getAttribLocation(pSolid,'p'), ca=gl.getAttribLocation(pSolid,'c');
+  gl.enableVertexAttribArray(pa); gl.enableVertexAttribArray(ca);
+  gl.vertexAttribPointer(pa,2,gl.FLOAT,false,24,0);
+  gl.vertexAttribPointer(ca,4,gl.FLOAT,false,24,8);
+  gl.disable(gl.BLEND);
+  gl.drawArrays(gl.TRIANGLES,0,SKYCOUNT);
+  gl.disableVertexAttribArray(ca);
+}
+
+// The sweep-dependent alphas, rewritten per frame. Cheaper than rebuilding the
+// silhouette, and it keeps the jitter stable while the light moves.
+function tintCliff(){
+  if(!SCOUNT) return;
+  const A=SARR, lit=BEAM.on;
+  // The beam is dark for 8-20s between passes, so a rim that only lights during a
+  // sweep leaves the headland unlit almost all the time. rimBase is the floor.
+  const ri=P.rim*(P.rimBase+(1.0-P.rimBase)*lit);
+  for(const v of RIM_AT) A[v*6+5]=ri;
+  // A lighthouse lamp is lit even when the beam is pointed away from you -- the
+  // glass still shows. Idle value is high enough to be a visible point.
+  const lg=0.55+0.45*lit;
+  for(const v of GLASS_AT) A[v*6+5]=lg;
+  const pulse=P.hazeBase+(1.0-P.hazeBase)*lit;
+  for(const v of HALO_AT) A[v*6+5]=0.34*P.haze*pulse;
+  gl.bindBuffer(gl.ARRAY_BUFFER,SBUF);
+  gl.bufferSubData(gl.ARRAY_BUFFER,0,SARR.subarray(0,SCOUNT*6));
+}
+
+function drawCliff(){
+  if(!SCOUNT) return;
+  gl.useProgram(pSolid);
+  const U=n=>gl.getUniformLocation(pSolid,n);
+  gl.uniform2f(U('res'),W,H);
+  gl.uniform1f(U('mul'),1);
+  gl.bindBuffer(gl.ARRAY_BUFFER,SBUF);
+  const pa=gl.getAttribLocation(pSolid,'p'), ca=gl.getAttribLocation(pSolid,'c');
+  gl.enableVertexAttribArray(pa); gl.enableVertexAttribArray(ca);
+  gl.vertexAttribPointer(pa,2,gl.FLOAT,false,24,0);
+  gl.vertexAttribPointer(ca,4,gl.FLOAT,false,24,8);
+  // Opaque: blending off, so the rock actually hides the water behind it.
+  if(SOLID_OPAQUE>0){
+    gl.disable(gl.BLEND);
+    gl.drawArrays(gl.TRIANGLES,0,SOLID_OPAQUE);
+    gl.enable(gl.BLEND);
+  }
+  // Additive: rim, glass, halo -- same blend the water uses.
+  if(SCOUNT>SOLID_OPAQUE)
+    gl.drawArrays(gl.TRIANGLES,SOLID_OPAQUE,SCOUNT-SOLID_OPAQUE);
+  gl.disableVertexAttribArray(ca);
+}
+
+// ------------------------------------------------------------------ beam ---
+// The lamp sweeps, pauses in the dark, and occasionally sweeps twice. All three
+// intervals are randomised: a fixed gap is still a metronome, just a sparser
+// one, and a predictable beat behind body copy pulls the eye off the text.
+const BEAM={phase:0, on:0, until:0, dir:1, left:0, next:3};
+const GUARD={on:0, x0:0, y0:0, x1:0, y1:0};
+function readGuard(){
+  if(P.beamGuard<=0){ GUARD.on=0; return; }
+  // .copy in the lab file, .masthead on the live page -- whichever copy block the
+  // beam has to stay out from behind.
+  const ce=document.querySelector('.copy, .masthead');
+  if(!ce){ GUARD.on=0; return; }
+  const r=ce.getBoundingClientRect(), c=cv.getBoundingClientRect();
+  GUARD.on=1;
+  GUARD.x0=r.left-c.left; GUARD.y0=r.top-c.top;
+  GUARD.x1=r.right-c.left; GUARD.y1=r.bottom-c.top;
+}
+let beamT=0;
+// Its own RNG stream. Sharing grnd() with the gusts would mean the beam's timing
+// draws shift the wave field, so changing a beam setting would silently change
+// the water -- and any A/B of the two would be measuring both at once.
+let bSeed=987654321;
+function brnd(){
+  bSeed^=bSeed<<13; bSeed>>>=0;
+  bSeed^=bSeed>>17;
+  bSeed^=bSeed<<5;  bSeed>>>=0;
+  return bSeed/4294967296;
+}
+function beamStep(dt){
+  beamT+=dt;
+  const span=Math.max(.15,P.beamSweep);
+  if(BEAM.left>0){
+    // Mid-sweep. elapsed runs 0..span across one crossing.
+    const el=span-(BEAM.until-beamT);
+    const k=Math.min(1,Math.max(0,el/span));
+    // Swings through a bit more than the visible arc so the beam enters and
+    // leaves rather than appearing already on screen.
+    BEAM.phase=-1.4+2.8*(BEAM.dir>0?k:1-k);
+    // Fade in and out across the pass, so it does not switch on hard.
+    BEAM.on=Math.sin(Math.PI*k);
+    if(beamT>=BEAM.until){
+      BEAM.left--;
+      if(BEAM.left>0){ BEAM.dir*=-1; BEAM.until=beamT+span; }
+      else{
+        BEAM.on=0;
+        const lo=Math.max(0,P.beamGapMin), hi=Math.max(lo,P.beamGapMax);
+        BEAM.next=beamT+lo+brnd()*(hi-lo);
+      }
+    }
+    return;
+  }
+  // Dark between sweeps.
+  BEAM.on=0;
+  if(beamT>=BEAM.next){
+    BEAM.left=(P.beamDouble>0 && brnd()<1/P.beamDouble)?2:1;
+    BEAM.dir=brnd()<0.5?1:-1;
+    BEAM.until=beamT+span;
+  }
+}
+
+// ----------------------------------------------------------------- frame ---
+let last=performance.now(), fps=60, acc=0, paused=false;
+
+function frame(now){
+  const dt=Math.min(.05,(now-last)/1000); last=now;
+  // Floor the interval, not just guard division: a backgrounded tab resumes with
+  // a near-zero or negative gap, and 1/1e-4 = 10000 poisons the smoothed average
+  // for minutes afterwards. 1ms is below any real frame, so it never clips.
+  if(dt>0.0005) fps+=((1/dt)-fps)*0.08;
+
+  if(!paused){
+    // Weather runs on the SIM clock, not wall time, so slowing the sim slows the
+    // weather with it -- otherwise dropping sim speed would leave the wind
+    // cycling at the same rate against water that no longer responds to it.
+    wxT+=dt*P.speed*60/60;
+    // The beam runs on WALL time, not sim time: it is a machine on a headland,
+    // not part of the water, so slowing the sea should not slow its rotation.
+    beamStep(dt);
+    readGuard();
+
+    // Gusts first: stamp into the CPU buffer, upload once, then step. Batching
+    // the frame's gusts into a single readback/upload pair keeps the round trip
+    // to one per frame rather than one per gust.
+    gustAcc+=dt*P.gustRate;
+    if(gustAcc>=1){
+      readSim();
+      while(gustAcc>=1){ gust(); gustAcc-=1; }
+      if(gustDirty){ writeSim(); gustDirty=false; }
+    }
+
+    // Fixed timestep, decoupled from the display rate: the wave equation is only
+    // stable for a given step size, so a slow frame runs more steps rather than
+    // a bigger one.
+    acc+=dt*P.speed*60;
+    let steps=0;
+    while(acc>=1 && steps<4){ simStep(); acc-=1; steps++; }
+    backstop();
+  }
+
+  gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+  gl.viewport(0,0,cv.width,cv.height);
+  gl.clearColor(0.027,0.039,0.063,1);          // flat ground, no sky gradient
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  drawSky();
+
+  gl.useProgram(pLine);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA,gl.ONE);   // additive, like 'lighter'
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D,texA);
+  const U=n=>gl.getUniformLocation(pLine,n);
+  gl.uniform1i(U('sim'),0);
+  gl.uniform2f(U('res'),W,H);
+  gl.uniform1f(U('N'),Math.max(1,Math.round(P.lines))); gl.uniform1f(U('M'),M);
+  gl.uniform1f(U('step'),P.ptStep);
+  gl.uniform1f(U('hz'),horizonY());
+  gl.uniform1f(U('persp'),P.persp);
+  gl.uniform1f(U('amp'),P.amp);   gl.uniform1f(U('ampNear'),P.ampNear);
+  gl.uniform1f(U('simGain'),P.simGain);
+  gl.uniform1f(U('simH'),GH);
+  gl.uniform1f(U('fetch'),P.fetch);
+  gl.uniform1f(U('skirt'),P.skirt);
+  gl.uniform1f(U('lineW'),P.width*DPR);
+  gl.uniform1f(U('widthNear'),P.widthNear);
+  gl.uniform1f(U('dimFar'),P.dimFar);
+  gl.uniform1f(U('bright'),P.bright);
+  gl.uniform1f(U('slopeLit'),P.slopeLit);
+  gl.uniform1f(U('litRange'),P.litRange);
+  gl.uniform1f(U('litGamma'),Math.max(.05,P.litGamma));
+  gl.uniform1f(U('floorLit'),P.floor);
+  gl.uniform1f(U('crestGain'),P.crest);
+  gl.uniform1f(U('beam'),P.beam);
+  gl.uniform2f(U('lampP'),CLIFF.lampX,CLIFF.lampY);
+  gl.uniform1f(U('guard'),GUARD.on?P.beamGuard:0);
+  gl.uniform4f(U('guardBox'),GUARD.x0,GUARD.y0,GUARD.x1,GUARD.y1);
+  gl.uniform1f(U('beamWidth'),P.beamWidth);
+  gl.uniform1f(U('beamSoft'),P.beamSoft);
+  gl.uniform1f(U('beamLift'),P.beamLift);
+  gl.uniform1f(U('beamPhase'),BEAM.phase);
+  gl.uniform1f(U('beamOn'),BEAM.on);
+  gl.uniform1f(U('beamWarm'),P.beamWarm);
+  gl.uniform1f(U('beamSat'),P.beamSat);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER,LBUF);
+  const la=gl.getAttribLocation(pLine,'a');
+  gl.enableVertexAttribArray(la);
+  gl.vertexAttribPointer(la,3,gl.FLOAT,false,0,0);
+
+  // Glow first, underneath: the same geometry widened and drawn faint. Additive
+  // blending means the core pass then sits on top of its own halo. On Canvas this
+  // was the single most expensive thing in the frame -- it doubled every stroke --
+  // and here it is one extra draw call of the same buffer.
+  if(P.glow>0 && P.glowAmt>0){
+    gl.uniform1f(U('glowW'),P.glow*DPR);
+    gl.uniform1f(U('alphaMul'),P.glowAmt);
+    gl.drawArrays(gl.TRIANGLES,0,LCOUNT);
+  }
+  gl.uniform1f(U('glowW'),0);
+  gl.uniform1f(U('alphaMul'),1);
+  gl.drawArrays(gl.TRIANGLES,0,LCOUNT);
+  gl.disableVertexAttribArray(la);
+
+  // Headland last. It occludes the water by painting over it, which is why the
+  // rock fill runs with blending OFF: the water composites additively, so a
+  // translucent silhouette would have the lines glowing straight through it.
+  // The rim and halo want the additive path, so they are split out.
+  tintCliff();
+  drawCliff();
+
+
   requestAnimationFrame(tick);
 }
-// The panel reaches in through these; nothing else does.
-WATER.P=P; WATER.DEF=DEF; WATER.STORE=STORE; WATER.fit=fit;
+
+// The panel is a prototyping tool, not part of the page. water-panel.js reaches
+// in through these when #tune is in the URL; nothing else does.
+WATER.P=P; WATER.DEF=FILE_DEF; WATER.fit=fit;
+WATER.buildLines=buildLines; WATER.buildCliff=buildCliff;
 
 // Reduced motion: draw one frame so the hero is not blank, then stop. Honour a
 // later change of the setting too -- some people toggle it while reading.
@@ -1313,6 +1109,9 @@ function tick(now){
   if(!visible||RM.matches) return;   // restarted by the observer / media listener
   frame(now);
 }
+
+addEventListener('resize',fit);
+fit();
 // One frame either way, so the hero is never blank -- then the gate decides.
 requestAnimationFrame(RM.matches?frame:tick);
 RM.addEventListener('change',()=>{ if(!RM.matches) requestAnimationFrame(tick); });
