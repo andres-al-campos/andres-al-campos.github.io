@@ -1085,9 +1085,39 @@ function frame(now){
 }
 
 // The panel is a prototyping tool, not part of the page. water-panel.js reaches
-// in through these when #tune is in the URL; nothing else does.
+// in through these and nothing else, so it stays loadable from any page that
+// runs the renderer.
 WATER.P=P; WATER.DEF=FILE_DEF; WATER.fit=fit;
 WATER.buildLines=buildLines; WATER.buildCliff=buildCliff;
+
+// Three clicks on the lantern open the tuning panel. Nothing links to it -- the
+// lamp is the only part of the scene small and deliberate enough that hitting it
+// three times running cannot happen by accident.
+let taps=0, tapAt=0;
+// Listening on the document, not the canvas: the masthead's paragraphs are
+// full-width blocks that reach over the headland, so a click on the lantern
+// lands on .intro and never reaches the canvas underneath.
+addEventListener('click',e=>{
+  if(!CLIFF.on) return;
+  const t=e.target;
+  if(t&&t.closest&&t.closest('a,button,input,label,select,textarea')) return;
+  const r=cv.getBoundingClientRect();
+  // W/H and CLIFF are in CSS pixels -- the backing store is dpr times larger,
+  // but that scaling lives in the projection, not here. The rect is CSS pixels
+  // too, so the click needs no conversion beyond the canvas origin.
+  const x=e.clientX-r.left, y=e.clientY-r.top;
+  const rad=Math.max(34,CLIFF.tw*4.0);
+  if(Math.hypot(x-CLIFF.lampX,y-CLIFF.lampY)>rad){ taps=0; return; }
+  const now=performance.now();
+  taps = now-tapAt<900 ? taps+1 : 1;
+  tapAt=now;
+  if(taps<3) return;
+  taps=0;
+  if(document.getElementById('wpanel')) return;
+  const s=document.createElement('script');
+  s.src='water-panel.js';
+  document.head.appendChild(s);
+});
 
 // Reduced motion: draw one frame so the hero is not blank, then stop. Honour a
 // later change of the setting too -- some people toggle it while reading.
