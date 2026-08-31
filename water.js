@@ -61,6 +61,7 @@ const P={
   gustDir:1.0,
   hzSkirt:6, fetch:34, skirt:20,
   wind:1.15, gustRate:34, gustSize:17,
+  warmup:25,          // seconds of sim run before the first paint. 0 = start flat
   windDir:1.45, windSpread:.10,
 
   // --- stage 2: weather -----------------------------------------------------
@@ -1143,8 +1144,47 @@ function tick(now){
   frame(now);
 }
 
+// Run the sim forward before the first paint, so the hero opens on moving water
+// instead of the flat lines it starts from. This is the same loop frame() runs,
+// minus the drawing: gusts stamp into the CPU buffer, one upload per simulated
+// frame, then the wave step. At 340x210 a step is a cheap fragment pass, so a
+// couple of seconds of blocking work buys the ~25s of settling the surface needs
+// to look like weather rather than a disturbance that just started.
+//
+// The readback in readSim() is the expensive part -- it stalls the pipeline --
+// which is why gusts are batched per simulated frame here exactly as they are
+// per real frame in the loop, rather than uploading once per gust.
+function warmup(simSeconds){
+  const frames=Math.round(simSeconds*60);
+  // Gusts are batched across BATCH frames rather than applied every frame. Each
+  // batch costs one readback, and a readback stalls the pipeline -- doing it at
+  // the live cadence meant ~850 stalls and 3.6s of frozen page. The water does
+  // not care when in the window a gust landed, only that it landed, so stamping
+  // a window's worth at once gives the same sea for a fraction of the cost.
+  const BATCH=30;
+  let ga=0, pending=0;
+  for(let f=0;f<frames;f++){
+    wxT+=P.speed;
+    ga+=(1/60)*P.gustRate;
+    while(ga>=1){ pending++; ga-=1; }
+    if(pending && (f%BATCH===BATCH-1 || f===frames-1)){
+      readSim();
+      while(pending>0){ gust(); pending--; }
+      writeSim();
+    }
+    simStep();
+  }
+  // One backstop at the end rather than every 30 steps: it exists to catch the
+  // sim diverging over minutes of running, and its own readback is the cost.
+  simTick=29; backstop();
+}
+
 addEventListener('resize',fit);
 fit();
+// The sim grid is a fixed size and outlives resize, so this runs once. Reduced
+// motion draws a single frame and stops, and a still frame of flat lines is the
+// wrong picture of the page -- so it gets the warm surface too.
+warmup(P.warmup);
 // One frame either way, so the hero is never blank -- then the gate decides.
 requestAnimationFrame(RM.matches?frame:tick);
 RM.addEventListener('change',()=>{ if(!RM.matches) requestAnimationFrame(tick); });
