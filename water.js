@@ -39,15 +39,22 @@ if(!EXT_F) throw new Error('OES_texture_float missing. The wave sim stores signe
 
 const P={
   // --- geometry / framing (matches water.js) ---
-  lines:120, horizon:.34, persp:1.75,
+  // Rows swing far more vertically than they are spaced apart, so they cross each
+  // other constantly and the crossings read as a crosshatch -- the "pixelation".
+  // Fewer rows and a smaller swing give each strand its own lane. The ratio of
+  // swing to row spacing was 13-19x here; at these values it is 6-8x.
+  lines:70, horizon:.34, persp:1.75,
   // Keeps the horizon below the masthead so body copy never sits on busy water.
   // Measured against the live page: with the water running under the intro the
   // contrast was 3.14 average and 1.0 worst case -- text pixels the same colour
   // as the water. That is the water itself, not the beam. Below about 591px of
   // viewport height the layout has no room, so the horizon yields instead.
   copyClear:26,       // px of water-free margin kept under the masthead copy
-  ptStep:4.5,
-  amp:.064, ampNear:1.0,
+  // Segment length in CSS px. At 4.5 a segment spanned 9 device px and 2.1 sim
+  // texels, so every curve was a polyline of straight chords sampled coarser
+  // than the field it draws -- faceting, which looks like aliasing but is not.
+  ptStep:2.0,
+  amp:.046, ampNear:1.0,
 
   // --- the simulation (values carried over from water.js, already tuned) ---
   simW:340, simH:210,
