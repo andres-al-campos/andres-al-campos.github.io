@@ -89,6 +89,7 @@ const SLIDERS=[
   ['persp',      'perspective',       1,   3,   .05, 2],
   ['amp',        'wave height',       .01, .2,  .002,3],
   ['ampNear',    'near height boost', 0,   3,   .05, 2],
+  ['ampFar',     'horizon height',    0,   .3,  .005,3],
   ['simGain',    'field -> height',   .5,  12,  .25, 2],
 
   ['Water',null,null,null,null],

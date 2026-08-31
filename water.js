@@ -55,6 +55,11 @@ const P={
   // than the field it draws -- faceting, which looks like aliasing but is not.
   ptStep:2.0,
   amp:.046, ampNear:1.0,
+  // Amplitude the farthest row keeps, as a fraction of the near field. At this
+  // camera angle the horizon is nearly edge-on, so a wave a metre high covers a
+  // pixel or two of screen -- the far rows should read as a flat line and let
+  // depth come from spacing, not from swell they cannot resolve at that size.
+  ampFar:.02,
 
   // --- the simulation (values carried over from water.js, already tuned) ---
   simW:340, simH:210,
@@ -312,7 +317,7 @@ precision highp float;
 attribute vec3 a;                 // x = line index, y = column, z = corner (-1/+1)
 uniform sampler2D sim;
 uniform vec2 res;
-uniform float N, M, step, hz, persp, amp, ampNear;
+uniform float N, M, step, hz, persp, amp, ampNear, ampFar;
 uniform float simGain, simH, fetch, skirt, lineW, widthNear;
 uniform float slopeLit, litRange, litGamma, floorLit, crestGain;
 uniform float dpr;
@@ -350,7 +355,7 @@ vec2 pointAt(float i, float j){
   // waves arrive already formed instead of materialising mid-scene.
   float x=-40.0 + j*step;
   float hgt=hAt(gridAt(i,j))*simGain;
-  float a2=(res.y-hz)*amp*(0.06+near*ampNear);
+  float a2=(res.y-hz)*amp*(ampFar+near*ampNear);
   return vec2(x, y0 - hgt*a2);
 }
 
@@ -821,10 +826,16 @@ function buildCliff(){
 
     // ---- opaque block ends here; the tower is opaque too, so it comes first ----
     const tw0=CLIFF.tw, tx0=CLIFF.lampX, ty0=CLIFF.lampY;
-    const tb0=top+(base-top)*0.16;
+    // The shaft runs well down the face rather than stopping just below the mesa
+    // line. A tower whose base sits near the top of the rock has its widest,
+    // lowest part against the palest stone -- measured 101 against 110, which is
+    // no edge at all, and the base dissolves into the headland.
+    const tb0=top+(base-top)*0.42;
     // Lighter than the rock behind it: a painted tower against dark stone is the
-    // whole silhouette, and matching the rock loses it into the mesa.
-    const TOWER=[0.031*P.rockLift*2.1, 0.047*P.rockLift*2.1, 0.071*P.rockLift*2.0, 1];
+    // whole silhouette, and matching the rock loses it into the mesa. The gain is
+    // above the rock's own waterline haze so the separation holds all the way
+    // down the shaft, not just against the sky.
+    const TOWER=[0.031*P.rockLift*2.5, 0.047*P.rockLift*2.5, 0.071*P.rockLift*2.4, 1];
     k=tri(A,k, tx0-tw0*0.72,tb0, tx0-tw0*0.46,ty0+tw0*0.5, tx0+tw0*0.46,ty0+tw0*0.5, TOWER);
     k=tri(A,k, tx0-tw0*0.72,tb0, tx0+tw0*0.46,ty0+tw0*0.5, tx0+tw0*0.72,tb0, TOWER);
     const CAP=[0.020*P.rockLift*1.5, 0.031*P.rockLift*1.5, 0.051*P.rockLift*1.5, 1];
@@ -1093,6 +1104,7 @@ function frame(now){
   gl.uniform1f(U('hz'),horizonY());
   gl.uniform1f(U('persp'),P.persp);
   gl.uniform1f(U('amp'),P.amp);   gl.uniform1f(U('ampNear'),P.ampNear);
+  gl.uniform1f(U('ampFar'),P.ampFar);
   gl.uniform1f(U('simGain'),P.simGain);
   gl.uniform1f(U('simH'),GH);
   gl.uniform1f(U('fetch'),P.fetch);
