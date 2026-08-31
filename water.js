@@ -130,6 +130,9 @@ const P={
   cliffRough:.55,     // how broken the face and top edge are. 0 = clean
   towerH:.075,        // tower height above the mesa, fraction of height
   towerW:.0155,       // tower width, fraction of screen width
+  lampPos:.14,        // where the tower stands on the mesa, 0 = seaward edge,
+                      // 1 = off the right of frame. Real lighthouses sit out on
+                      // the point, not back on the headland.
   // The headland is the nearest solid thing in frame, and at night the sky is
   // lighter than the land under it, not darker. Pure black rock on a near-black
   // sky gives about 1.4:1 and simply vanishes; this lifts it until the outline
@@ -716,7 +719,7 @@ function buildCliff(){
     CLIFF.x=W*P.cliffX;
     CLIFF.base=hz+H*0.012;
     CLIFF.top=hz-H*P.cliffH;
-    CLIFF.lampX=CLIFF.x+(W-CLIFF.x)*0.42;
+    CLIFF.lampX=CLIFF.x+(W-CLIFF.x)*P.lampPos;
     CLIFF.lampY=CLIFF.top-H*P.towerH;
     CLIFF.tw=Math.max(3,W*P.towerW);
   }

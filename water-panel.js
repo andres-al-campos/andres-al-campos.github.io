@@ -74,6 +74,7 @@ const SLIDERS=[
   ['cliffRough', 'rock roughness',    0,   1.5, .05, 2],
   ['towerH',     'tower height',      0,   .2,  .005,3],
   ['towerW',     'tower width',       .004,.05, .001,3],
+  ['lampPos',    'tower on point',    0,   .6,  .01, 2],
   ['rockLift',   'rock value',        .5,  5,   .05, 2],
   ['rockHaze',   'rock base haze',    0,   2,   .05, 2],
   ['footHaze',   'waterline haze',    0,   1,   .02, 2],
@@ -130,7 +131,7 @@ const DKEY='water.defaults';   // your saved defaults, only written by the butto
 // Everything else is a uniform and takes effect next frame.
 const rebuildOn={lines:1, ptStep:1};
 const cliffOn={sky:1, rockLift:1, rockHaze:1, footHaze:1, cliff:1, cliffX:1,
-               cliffH:1, cliffRough:1, towerH:1, towerW:1, seed:1, haze:1,
+               cliffH:1, cliffRough:1, towerH:1, towerW:1, lampPos:1, seed:1, haze:1,
                beam:1, lampX:1, horizon:1};
 
 function savePanel(){ try{ localStorage.setItem(PKEY,JSON.stringify(P)); }catch(e){} }
