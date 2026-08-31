@@ -302,6 +302,7 @@ uniform vec2 res;
 uniform float N, M, step, hz, persp, amp, ampNear;
 uniform float simGain, simH, fetch, skirt, lineW, widthNear;
 uniform float slopeLit, litRange, litGamma, floorLit, crestGain;
+uniform float dpr;
 uniform float beam, beamWidth, beamSoft, beamLift, beamPhase, beamOn;
 uniform vec2 lampP;
 uniform float guard;
@@ -402,6 +403,9 @@ void main(){
   // width, so the two compound: at width 1 and DPR 2 a foreground line is already
   // 2*(0.5+1.5)=4 device px, which is what clogs the near field.
   float w=lineW*(0.5+near*widthNear)*0.5+glowW;
+  // w is in CSS px, because p0/res are. The rasteriser works in device px, so the
+  // edge fade has to be measured there or it spans dpr pixels instead of one --
+  // which is exactly what a hard, unantialiased edge looks like at dpr 2.
   // Carry the across-line position and the half width so the fragment stage can
   // fade the edges. MSAA does not help here: it antialiases where triangles meet,
   // and a line's long edges are the silhouette of a single quad, so without this
@@ -411,10 +415,16 @@ void main(){
   // be drawn fainter. Below that floor the quad is held at a pixel and the lost
   // width is carried into alpha, which is what keeps far lines continuous
   // instead of breaking into a dashed shimmer as they thin.
-  float wMin=0.5;
-  vHalf=max(w, wMin);
+  //
+  // The floor is a FULL device pixel of half-width, not half of one. A quad one
+  // pixel wide overall still falls between two pixel centres wherever it sits at
+  // a fraction, and the row drops out there -- which is the stippling, not
+  // aliasing. Widening the quad and paying for it in alpha keeps the row solid.
+  float wMin=1.0/dpr;
+  float hw=max(w, wMin);
+  vHalf=hw*dpr;                        // device px, for the fragment stage
   vCov=min(1.0, w/wMin);
-  vec2 p=p0+nrm*a.z*vHalf;
+  vec2 p=p0+nrm*a.z*hw;
   gl_Position=vec4(p.x/res.x*2.0-1.0, 1.0-p.y/res.y*2.0, 0., 1.);
 }`;
 
@@ -1062,7 +1072,10 @@ function frame(now){
   gl.uniform1f(U('simH'),GH);
   gl.uniform1f(U('fetch'),P.fetch);
   gl.uniform1f(U('skirt'),P.skirt);
-  gl.uniform1f(U('lineW'),P.width*DPR);
+  // Width is a CSS-px quantity: the shader positions vertices in CSS px, and the
+  // dpr conversion now happens in the AA math where it belongs.
+  gl.uniform1f(U('lineW'),P.width);
+  gl.uniform1f(U('dpr'),DPR);
   gl.uniform1f(U('widthNear'),P.widthNear);
   gl.uniform1f(U('dimFar'),P.dimFar);
   gl.uniform1f(U('bright'),P.bright);
@@ -1093,7 +1106,7 @@ function frame(now){
   // was the single most expensive thing in the frame -- it doubled every stroke --
   // and here it is one extra draw call of the same buffer.
   if(P.glow>0 && P.glowAmt>0){
-    gl.uniform1f(U('glowW'),P.glow*DPR);
+    gl.uniform1f(U('glowW'),P.glow);   // CSS px, same space as lineW
     gl.uniform1f(U('alphaMul'),P.glowAmt);
     gl.drawArrays(gl.TRIANGLES,0,LCOUNT);
   }
