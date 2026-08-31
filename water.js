@@ -346,6 +346,12 @@ void main(){
   vec2 p1=pointAt(a.x,min(a.y+1.0,M-1.0));
   vec2 dir=normalize(p1-p0+vec2(1e-6,0.));
   vec2 nrm=vec2(-dir.y,dir.x);
+  // How far from horizontal this segment runs. The quad is offset along nrm, so
+  // on a steep flank the stroke tilts with it and its VERTICAL extent collapses
+  // to |dir.x| of the flat-water thickness -- at these amplitudes that reaches
+  // 80 degrees and a sixth of the width, which is the thick/thin banding along
+  // one line. Steep segments are widened back toward a constant apparent weight.
+  float horiz=abs(dir.x);
   float near=pow(rowU(a.x),1.25);
   vNear=near;
 
@@ -402,7 +408,13 @@ void main(){
   // Near lines are drawn wider so they read as closer. This multiplies the base
   // width, so the two compound: at width 1 and DPR 2 a foreground line is already
   // 2*(0.5+1.5)=4 device px, which is what clogs the near field.
-  float w=lineW*(0.5+near*widthNear)*0.5+glowW;
+  float w=lineW*(0.5+near*widthNear)*0.5;
+  // Divide by how horizontal the segment is, so a tilted stroke is drawn wider
+  // along its own normal and lands the same thickness on screen. Clamped: at
+  // dead vertical this diverges, and a fully compensated near-vertical segment
+  // would be a blob rather than a line.
+  w/=max(0.45,horiz);
+  w+=glowW;
   // w is in CSS px, because p0/res are. The rasteriser works in device px, so the
   // edge fade has to be measured there or it spans dpr pixels instead of one --
   // which is exactly what a hard, unantialiased edge looks like at dpr 2.
