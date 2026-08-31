@@ -920,7 +920,7 @@ function drawCliff(){
 // The lamp sweeps, pauses in the dark, and occasionally sweeps twice. All three
 // intervals are randomised: a fixed gap is still a metronome, just a sparser
 // one, and a predictable beat behind body copy pulls the eye off the text.
-const BEAM={phase:0, on:0, until:0, dir:1, left:0, next:3};
+const BEAM={phase:0, on:0, until:0, left:0, next:3};
 const GUARD={on:0, x0:0, y0:0, x1:0, y1:0};
 function readGuard(){
   if(P.beamGuard<=0){ GUARD.on=0; return; }
@@ -952,13 +952,16 @@ function beamStep(dt){
     const el=span-(BEAM.until-beamT);
     const k=Math.min(1,Math.max(0,el/span));
     // Swings through a bit more than the visible arc so the beam enters and
-    // leaves rather than appearing already on screen.
-    BEAM.phase=-1.4+2.8*(BEAM.dir>0?k:1-k);
+    // leaves rather than appearing already on screen. Always the same way
+    // round: the optic is on a turntable and only ever turns one direction, so
+    // a beam that came back the way it went would read as a searchlight being
+    // aimed. What looks like a pause between passes is the arc pointing inland.
+    BEAM.phase=-1.4+2.8*k;
     // Fade in and out across the pass, so it does not switch on hard.
     BEAM.on=Math.sin(Math.PI*k);
     if(beamT>=BEAM.until){
       BEAM.left--;
-      if(BEAM.left>0){ BEAM.dir*=-1; BEAM.until=beamT+span; }
+      if(BEAM.left>0){ BEAM.until=beamT+span; }
       else{
         BEAM.on=0;
         const lo=Math.max(0,P.beamGapMin), hi=Math.max(lo,P.beamGapMax);
@@ -971,7 +974,6 @@ function beamStep(dt){
   BEAM.on=0;
   if(beamT>=BEAM.next){
     BEAM.left=(P.beamDouble>0 && brnd()<1/P.beamDouble)?2:1;
-    BEAM.dir=brnd()<0.5?1:-1;
     BEAM.until=beamT+span;
   }
 }
