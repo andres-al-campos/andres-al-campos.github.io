@@ -58,6 +58,18 @@ body {
   z-index: 1;
 }
 
+/* The grid wants more room than the prose does. 880px is a comfortable measure
+   for the masthead paragraph, but split three ways it left 281px cards, which is
+   too narrow for a tagline plus a blurb. Widening only main keeps the reading
+   column where it was. */
+main {
+  max-width: 1120px;
+  /* The hero ends flush against the grid otherwise -- the first card starts the
+     instant the water stops. This is a section break, not a card gap, so it is
+     deliberately larger than the grid's own gutter. */
+  margin-top: clamp(40px, 6vw, 72px);
+}
+
 /* ---- masthead ---- */
 
 /* Top padding is deliberately short of what a centred block would take. The
@@ -138,7 +150,7 @@ body {
 .grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: clamp(14px, 1.8vw, 20px);
+  gap: clamp(16px, 2vw, 24px);
   align-items: stretch;
 }
 
