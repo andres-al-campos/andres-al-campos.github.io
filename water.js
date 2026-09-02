@@ -440,21 +440,36 @@ void main(){
   // fade the edges. MSAA does not help here: it antialiases where triangles meet,
   // and a line's long edges are the silhouette of a single quad, so without this
   // every line has hard stair-stepped sides. Canvas stroke() did this for free.
-  vEdge=a.z;
   // A line thinner than one device pixel cannot be drawn thinner -- it can only
-  // be drawn fainter. Below that floor the quad is held at a pixel and the lost
+  // be drawn fainter. Below that floor the line is held at a pixel and the lost
   // width is carried into alpha, which is what keeps far lines continuous
   // instead of breaking into a dashed shimmer as they thin.
   //
   // The floor is a FULL device pixel of half-width, not half of one. A quad one
   // pixel wide overall still falls between two pixel centres wherever it sits at
   // a fraction, and the row drops out there -- which is the stippling, not
-  // aliasing. Widening the quad and paying for it in alpha keeps the row solid.
+  // aliasing. Widening the line and paying for it in alpha keeps the row solid.
   float wMin=1.0/dpr;
   float hw=max(w, wMin);
-  vHalf=hw*dpr;                        // device px, for the fragment stage
   vCov=min(1.0, w/wMin);
-  vec2 p=p0+nrm*a.z*hw;
+
+  // The QUAD is one device pixel wider on each side than the line it draws. The
+  // coverage ramp needs to fall to zero OUTSIDE the line's true edge, and it can
+  // only do that on pixels the rasteriser actually shades -- a quad cut exactly
+  // at the edge leaves the ramp nowhere to go, so the outermost shaded pixel
+  // still lands at full-ish alpha and the stair-step survives however wide the
+  // fade is. Padding costs a sliver of fill and is what makes the edge analytic
+  // rather than merely soft.
+  float pad=1.0/dpr;
+  float hq=hw+pad;
+  // vEdge is carried in DEVICE PIXELS from the centreline, not as a -1..1 corner.
+  // The old form measured the fade against vHalf interpolated between the two
+  // ends of the segment, and the steepness compensation above can double the
+  // width at one end only -- so on a tilted segment the falloff was scaled by a
+  // width that did not match the edge being drawn.
+  vEdge=a.z*hq*dpr;
+  vHalf=hw*dpr;                        // device px, for the fragment stage
+  vec2 p=p0+nrm*a.z*hq;
   gl_Position=vec4(p.x/res.x*2.0-1.0, 1.0-p.y/res.y*2.0, 0., 1.);
 }`;
 
@@ -470,12 +485,18 @@ uniform float dimFar, bright, beamWarm, beamSat, alphaMul;
 void main(){
   float a=(dimFar+(1.0-dimFar)*vNear)*bright*vLit;
 
-  // Edge falloff, one device pixel wide. vEdge runs -1..1 across the line, so the
-  // distance from the edge in pixels is (1-|vEdge|)*vHalf. The fade is applied
-  // relative to the line's own width, not as a flat clamp: a flat clamp dims the
-  // whole line whenever the half-width is under a pixel, which is most of them.
-  float dpx=(1.0-abs(vEdge))*vHalf;
-  a*=clamp(dpx, 0.0, 1.0) * vCov;
+  // Analytic edge coverage. vEdge is the distance from the centreline in device
+  // pixels and vHalf is where the line's true edge is, so the transition is
+  // centred ON the edge and spans one pixel -- half inside, half out into the
+  // quad's padding. That is what a pixel's actual coverage does as the edge
+  // sweeps across it.
+  //
+  // The previous form ramped from the edge INWARD, which dimmed the line's own
+  // body while leaving the boundary pixel at full alpha: soft and still stepped,
+  // the worst of both. smoothstep rather than a linear ramp because the linear
+  // one leaves visible corners in the gradient where it clamps.
+  float cov=1.0-smoothstep(vHalf-0.5, vHalf+0.5, abs(vEdge));
+  a*=cov*vCov;
 
   vec3 cool=vec3(0.56,0.71,0.85);
   // Amber, desaturated toward warm-white by beamSat. Full-saturation amber on
