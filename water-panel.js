@@ -29,6 +29,13 @@ const CSS=`
   border:1px solid #35485c;border-radius:5px;color:#dbe6f0;cursor:pointer;
   background:#131c27;user-select:none}
 #wpanel .btn:hover{border-color:#ECC496}
+#wpanel .pset{display:inline-flex;align-items:center;gap:6px;margin:6px 6px 0 0;
+  padding:4px 6px 4px 9px;border:1px solid #35485c;border-radius:5px;
+  color:#dbe6f0;background:#131c27;user-select:none}
+#wpanel .pset:hover{border-color:#ECC496}
+#wpanel .pset .nm{cursor:pointer}
+#wpanel .pset .x{cursor:pointer;color:#5d7186;padding:0 2px}
+#wpanel .pset .x:hover{color:#e07a5f}
 #wtoggle{position:fixed;top:12px;right:12px;z-index:10;cursor:pointer;
   font:11px ui-monospace,Menlo,monospace;color:#ECC496;
   background:rgba(10,15,22,.9);border:1px solid #35485c;border-radius:5px;
@@ -51,6 +58,7 @@ const SLIDERS=[
   ['crest',      'crest gain',        1,   3,   .05, 2],
   ['glow',       'glow width',        0,   8,   .1,  1],
   ['glowAmt',    'glow strength',     0,   1,   .01, 2],
+  ['glowFloor',  'glow floor',        0,   1,   .01, 2],
 
   ['Light',null,null,null,null],
   ['beam',       'intensity',         0,   2,   .05, 2],
@@ -126,6 +134,7 @@ const SLIDERS=[
 
 const PKEY='water.params';     // live session values, saved on every drag
 const DKEY='water.defaults';   // your saved defaults, only written by the button
+const SKEY='water.presets';    // named checkpoints, {name: diff-from-file}
 
 // Line count and spacing change the mesh itself, so the vertex buffer has to be
 // rebuilt; the headland is baked at fit() time, so its shape params rebuild that.
@@ -151,7 +160,9 @@ html+='<div><span class="btn" id="wsaveDef">save as default</span>'+
       '<span class="btn" id="wreset">revert</span>'+
       '<span class="btn" id="wresetFile">reset to file</span>'+
       '<span class="btn" id="wcopy">copy values</span></div>'+
-      '<div id="wnote" style="margin-top:8px;color:#5d7186"></div>';
+      '<div id="wnote" style="margin-top:8px;color:#5d7186"></div>'+
+      '<h4>presets</h4><div id="wpresets"></div>'+
+      '<div><span class="btn" id="wsavePreset">save preset</span></div>';
 
 const panel=document.createElement('div');
 panel.id='wpanel'; panel.innerHTML=html;
@@ -187,9 +198,13 @@ refreshNote();
 
 // Only the diff from the file, so a later change to a value I never touched is
 // picked up rather than pinned to whatever it happened to be today.
-document.getElementById('wsaveDef').onclick=()=>{
+function diffFromFile(){
   const diff={};
   for(const k in P) if(P[k]!==FILE_DEF[k]) diff[k]=P[k];
+  return diff;
+}
+document.getElementById('wsaveDef').onclick=()=>{
+  const diff=diffFromFile();
   try{ localStorage.setItem(DKEY,JSON.stringify(diff)); }catch(e){}
   const b=document.getElementById('wsaveDef');
   b.textContent='saved'; setTimeout(()=>b.textContent='save as default',900);
@@ -215,6 +230,64 @@ document.getElementById('wcopy').onclick=()=>{
   navigator.clipboard&&navigator.clipboard.writeText(txt);
   const b=document.getElementById('wcopy');
   b.textContent='copied'; setTimeout(()=>b.textContent='copy values',900);
+};
+
+// Named checkpoints. Stored as a diff from the file like the saved defaults are,
+// so loading an old preset picks up any file value I have changed since rather
+// than pinning all ~70 params to whatever they happened to be the day it was saved.
+function readPresets(){
+  try{ return JSON.parse(localStorage.getItem(SKEY)||'{}'); }catch(e){ return {}; }
+}
+function writePresets(o){ try{ localStorage.setItem(SKEY,JSON.stringify(o)); }catch(e){} }
+
+function applyParams(diff){
+  for(const k in FILE_DEF) P[k]=FILE_DEF[k];
+  for(const k in diff) P[k]=diff[k];
+  // Sliders show stale numbers otherwise, and the mesh/headland are baked, not uniforms.
+  for(const [k,lab,lo,hi,step,dp] of SLIDERS){
+    if(lab===null) continue;
+    const el=document.getElementById('ws_'+k), out=document.getElementById('wv_'+k);
+    if(el) el.value=P[k];
+    if(out) out.textContent=(+P[k]).toFixed(dp);
+  }
+  if(WATER.buildLines) WATER.buildLines();
+  if(WATER.buildCliff) WATER.buildCliff();
+  savePanel();
+}
+
+function renderPresets(){
+  const box=document.getElementById('wpresets');
+  if(!box) return;
+  const ps=readPresets(), names=Object.keys(ps).sort();
+  if(!names.length){ box.innerHTML='<span style="color:#5d7186">none saved</span>'; return; }
+  box.innerHTML='';
+  for(const n of names){
+    const chip=document.createElement('span');
+    chip.className='pset';
+    const nm=document.createElement('span');
+    nm.className='nm'; nm.textContent=n;
+    nm.onclick=()=>{ applyParams(readPresets()[n]||{}); note('loaded "'+n+'"'); };
+    const x=document.createElement('span');
+    x.className='x'; x.textContent='x'; x.title='delete';
+    x.onclick=()=>{
+      if(!confirm('Delete preset "'+n+'"?')) return;
+      const o=readPresets(); delete o[n]; writePresets(o); renderPresets();
+    };
+    chip.appendChild(nm); chip.appendChild(x);
+    box.appendChild(chip);
+  }
+}
+renderPresets();
+
+document.getElementById('wsavePreset').onclick=()=>{
+  const n=(prompt('Preset name:')||'').trim();
+  if(!n) return;
+  const ps=readPresets();
+  if(ps[n] && !confirm('Overwrite preset "'+n+'"?')) return;
+  ps[n]=diffFromFile();
+  writePresets(ps);
+  renderPresets();
+  note('saved "'+n+'"');
 };
 
 // Escape closes it, since there is no other way out once it is open.
