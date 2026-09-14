@@ -117,6 +117,10 @@ const P={
   crest:1.4,          // extra gain on the sharpest crests
   glow:3.0,           // halo radius in CSS px. Exponential falloff, not coverage
   glowAmt:.55,        // its alpha. High: the halo carries the line, not the core
+  glowFloor:.7,       // how much of the halo ignores wave shading. 0 = halo
+                      // tracks brightness (dim lines get no halo, so no edge
+                      // ramp, so they look aliased); 1 = every line gets the
+                      // same halo whatever its brightness.
 
   // --- stage 3: the light ---------------------------------------------------
   // A position and a sweep, standing in for the lighthouse. Where the beam lands
@@ -128,6 +132,12 @@ const P={
   beamLift:1.6,       // specular gain on crests facing the lamp
   beamWarm:1.0,       // how far lit water shifts toward amber
   beamSat:.72,        // amber saturation. 1 = full amber, 0 = neutral warm-white
+  beamGain:1.6,       // extra alpha under the beam. Reads as THICKNESS, not just
+                      // brightness: the halo is a Gaussian, so a brighter one
+                      // stays above the visible threshold further from the
+                      // centreline. Lower this to close the gap between lit and
+                      // unlit lines. Width goes as the log of the gain, so it
+                      // moves slower than the number suggests.
   beamSweep:2.0,      // seconds for one crossing
   beamGapMin:8,       // seconds of dark between sweeps, low end...
   beamGapMax:20,      // ...and high. Randomised: a FIXED gap is still a metronome,
@@ -226,7 +236,15 @@ function horizonY(){
 
 function fit(){
   DPR=Math.min(2,devicePixelRatio||1);
-  W=innerWidth; H=innerHeight;
+  // Measure the CANVAS, not the window. innerWidth includes the scrollbar gutter,
+  // so on any platform that reserves one the buffer came out wider than the box
+  // CSS gives the canvas -- 1956 device px displayed in 948 CSS px, a 2.06x
+  // resample. The browser then rescales every frame through a fractional factor,
+  // which re-aliases the lines the shader just spent its whole fragment stage
+  // antialiasing. Sizing from the element's own box keeps buffer:display at
+  // exactly DPR:1, so a device pixel in the shader is a device pixel on screen.
+  const r=cv.getBoundingClientRect();
+  W=Math.max(1,Math.round(r.width)); H=Math.max(1,Math.round(r.height));
   cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR);
   buildLines();
   buildCliff();
@@ -318,7 +336,7 @@ attribute vec3 a;                 // x = line index, y = column, z = corner (-1/
 uniform sampler2D sim;
 uniform vec2 res;
 uniform float N, M, step, hz, persp, amp, ampNear, ampFar;
-uniform float simGain, simH, fetch, skirt, lineW, widthNear;
+uniform float simGain, simW, simH, fetch, skirt, lineW, widthNear;
 uniform float slopeLit, litRange, litGamma, floorLit, crestGain;
 uniform float dpr;
 uniform float beam, beamWidth, beamSoft, beamLift, beamPhase, beamOn;
@@ -343,7 +361,33 @@ vec2 gridAt(float i, float j){
   float x=-40.0 + j*step;
   return vec2(fract(x/res.x), gy/simH);
 }
-float hAt(vec2 g){ return texture2D(sim,g).r; }
+// Bilinear by hand. The texture is NEAREST because the SIM needs it that way --
+// it reads its own neighbours at exactly +/-1 texel and LINEAR would low-pass
+// the field every step, which damps the whole sea flat within a second (tried
+// it). But the renderer samples at arbitrary points between texels, so under
+// NEAREST it sees a staircase: the height holds for ~5 device px, then jumps.
+// That lands in the line's PATH, which is why it survived every round of edge
+// antialiasing -- those smooth a line's sides, not the curve it follows.
+//
+// Blending the 4 surrounding texels here gives the renderer a smooth field
+// while the sim keeps its exact taps. x wraps (the sea is periodic), y clamps,
+// same convention as tap() in FS_SIM.
+float hAt(vec2 g){
+  vec2 sz=vec2(simW, simH);
+  vec2 t=g*sz-0.5;
+  vec2 f=fract(t);
+  vec2 b=floor(t);
+  // Texel centres of the four neighbours, in UV.
+  vec2 uv00=(b+0.5)/sz;
+  vec2 uv11=(b+1.5)/sz;
+  float x0=fract(uv00.x), x1=fract(uv11.x);
+  float y0=clamp(uv00.y,0.001,0.999), y1=clamp(uv11.y,0.001,0.999);
+  float h00=texture2D(sim,vec2(x0,y0)).r;
+  float h10=texture2D(sim,vec2(x1,y0)).r;
+  float h01=texture2D(sim,vec2(x0,y1)).r;
+  float h11=texture2D(sim,vec2(x1,y1)).r;
+  return mix(mix(h00,h10,f.x), mix(h01,h11,f.x), f.y);
+}
 
 vec2 pointAt(float i, float j){
   float u=rowU(i);
@@ -481,7 +525,7 @@ varying float vWarm;
 varying float vEdge;
 varying float vHalf;
 varying float vCov;
-uniform float dimFar, bright, beamWarm, beamSat, alphaMul, isGlow;
+uniform float dimFar, bright, beamWarm, beamSat, alphaMul, isGlow, glowFloor, beamGain;
 void main(){
   float a=(dimFar+(1.0-dimFar)*vNear)*bright*vLit;
 
@@ -507,6 +551,23 @@ void main(){
   // shimmer. The halo has no such floor, so it can carry the line's presence
   // while the core sits right at the floor, opaque and sharp.
   if(isGlow>0.5){
+    // The halo is what antialiases these lines. Measured on the live scene: an
+    // unlit line is 2.16 device px wide with sd 0.36 -- almost no transition
+    // zone, which is the hard-edged look. Under the beam the same geometry
+    // measures 2.80 median, and the lines read as smooth. Contrast is identical
+    // in both (0.896 vs 0.891), so brightness against the background is NOT
+    // what changes; the width of the edge ramp is.
+    //
+    // The cause is right above: a is already scaled by vLit and vNear, so a dim
+    // line gets a dim halo and therefore a narrow one. That couples "how bright
+    // is this wave" to "how antialiased is it", which is backwards -- every line
+    // needs the same edge treatment whatever its brightness.
+    //
+    // So the halo keeps a floor of its own. glowFloor is the share of the halo
+    // that ignores shading entirely; the rest still tracks the line so crests
+    // keep their bloom.
+    float depth=(dimFar+(1.0-dimFar)*vNear)*bright;   // keep distance fade
+    a=depth*mix(vLit, 1.0, glowFloor);                // but flatten the shading
     float sigma=max(0.35, vHalf*0.6);
     float d=abs(vEdge);
     a*=exp(-(d*d)/(2.0*sigma*sigma));
@@ -523,7 +584,7 @@ void main(){
 
   // The beam adds light rather than only recolouring: lit water is brighter than
   // unlit water, which is the whole point of a lighthouse.
-  a*=1.0+vWarm*1.6;
+  a*=1.0+vWarm*beamGain;
 
   a*=alphaMul;
   gl_FragColor=vec4(col*a, a);
@@ -562,6 +623,14 @@ function mkTex(){
   gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,GW,GH,0,gl.RGBA,gl.FLOAT,null);
   // NEAREST: the sim reads its own neighbours at exactly +/-1 texel, and LINEAR
   // would return interpolated values -- a low-pass applied every single step.
+  //
+  // Verified the hard way: flipping this to LINEAR damps the field to flat
+  // within a second. The renderer DOES want LINEAR (under NEAREST it samples a
+  // piecewise-constant height field, which puts a staircase in each line's path
+  // before rasterisation), but it cannot get it by changing the filter here --
+  // the sim and the renderer share these texture objects. Giving the renderer a
+  // smooth field needs a separate path: a second texture view, or interpolating
+  // in the vertex shader.
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
   // CLAMP on both axes; x wrapping is done with fract() in the shader. See the
@@ -1143,6 +1212,7 @@ function frame(now){
   gl.uniform1f(U('amp'),P.amp);   gl.uniform1f(U('ampNear'),P.ampNear);
   gl.uniform1f(U('ampFar'),P.ampFar);
   gl.uniform1f(U('simGain'),P.simGain);
+  gl.uniform1f(U('simW'),GW);
   gl.uniform1f(U('simH'),GH);
   gl.uniform1f(U('fetch'),P.fetch);
   gl.uniform1f(U('skirt'),P.skirt);
@@ -1169,6 +1239,7 @@ function frame(now){
   gl.uniform1f(U('beamOn'),BEAM.on);
   gl.uniform1f(U('beamWarm'),P.beamWarm);
   gl.uniform1f(U('beamSat'),P.beamSat);
+  gl.uniform1f(U('beamGain'),P.beamGain);
 
   gl.bindBuffer(gl.ARRAY_BUFFER,LBUF);
   const la=gl.getAttribLocation(pLine,'a');
@@ -1182,6 +1253,7 @@ function frame(now){
   if(P.glow>0 && P.glowAmt>0){
     gl.uniform1f(U('glowW'),P.glow);   // CSS px, same space as lineW
     gl.uniform1f(U('alphaMul'),P.glowAmt);
+    gl.uniform1f(U('glowFloor'),P.glowFloor);
     gl.uniform1f(U('isGlow'),1);
     gl.drawArrays(gl.TRIANGLES,0,LCOUNT);
   }

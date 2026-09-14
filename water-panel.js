@@ -68,6 +68,7 @@ const SLIDERS=[
   ['beamLift',   'crest specular',    0,   4,   .05, 2],
   ['beamWarm',   'warmth',            0,   1,   .02, 2],
   ['beamSat',    'amber saturation',  0,   1,   .02, 2],
+  ['beamGain',   'lit boost',         0,   3,   .05, 2],
   ['beamSweep',  'sweep seconds',     .3,  8,   .1,  1],
   ['beamGapMin', 'gap min (s)',       0,   30,  1,   0],
   ['beamGapMax', 'gap max (s)',       1,   60,  1,   0],
