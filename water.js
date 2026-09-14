@@ -127,6 +127,13 @@ const P={
   // the water lifts and warms; elsewhere it keeps the cool base colour.
   beam:1.0,           // master intensity. 0 = off
   lampX:.42,          // where the lamp sits across the screen, 0..1
+  beamRound:1,        // 0 = swept cone, 1 = circular pool under the lamp.
+                      // Blends, so values between give a cone that never fully
+                      // leaves the pool.
+  beamRadius:.34,     // pool radius as a fraction of canvas width. Only used
+                      // when beamRound > 0.
+  beamPool:.8,        // pool brightness. Stands in for beamOn, which the pool
+                      // bypasses so it stays lit between sweeps.
   beamWidth:.30,      // angular half-width of the lit cone, radians
   beamSoft:.55,       // fraction of the cone that is soft edge
   beamLift:1.6,       // specular gain on crests facing the lamp
@@ -157,9 +164,13 @@ const P={
   cliffX:.70,         // where the cliff face meets the horizon, 0..1
   cliffH:.085,        // mesa top above the horizon, as a fraction of height
   cliffRough:.55,     // how broken the face and top edge are. 0 = clean
-  towerH:.075,        // tower height above the mesa, fraction of height
-  towerW:.0155,       // tower width, fraction of screen width
-  lampPos:.14,        // where the tower stands on the mesa, 0 = seaward edge,
+  towerH:.115,        // tower height above the mesa, fraction of height. This
+                      // scales the whole sprite, since its width follows from
+                      // the art's aspect ratio.
+  towerW:.0155,       // tower width, fraction of screen width. Only the lit
+                      // glass and halo size off this now -- the sprite's own
+                      // width comes from towerH and the art's aspect ratio.
+  lampPos:.30,        // where the tower stands on the mesa, 0 = seaward edge,
                       // 1 = off the right of frame. Real lighthouses sit out on
                       // the point, not back on the headland.
   // The headland is the nearest solid thing in frame, and at night the sky is
@@ -340,6 +351,7 @@ uniform float simGain, simW, simH, fetch, skirt, lineW, widthNear;
 uniform float slopeLit, litRange, litGamma, floorLit, crestGain;
 uniform float dpr;
 uniform float beam, beamWidth, beamSoft, beamLift, beamPhase, beamOn;
+uniform float beamRound, beamRadius, beamPool;
 uniform vec2 lampP;
 uniform float guard;
 uniform vec4 guardBox;   // x0,y0,x1,y1 in CSS px
@@ -446,10 +458,25 @@ void main(){
   // instead of staying a fixed width on screen.
   // The lamp is a screen point now, not a fraction: with the headland on it rides
   // the top of the tower, so the glare path converges on the light you can see.
+  // beamRound picks the shape: 0 is the swept angular cone, 1 a circular pool
+  // of light centred under the lamp. The cone spreads with distance the way a
+  // real beam does; the pool is a steady glow that doesn't sweep.
   float ang=atan(p0.x-lampP.x, max(1.0,p0.y-lampP.y));
   float d=abs(ang-beamPhase);
   float edge=beamWidth*max(0.001,beamSoft);
   float cone=1.0-smoothstep(beamWidth-edge, beamWidth+edge, d);
+
+  // Radial falloff, in screen units scaled off the canvas so it holds its
+  // proportion at any size. Centred at the waterline under the lamp, not at the
+  // lamp itself: the lamp is well above the horizon, so a circle centred on it
+  // lands off the water entirely and the pool never appears. Squashed
+  // vertically because the surface is in perspective -- a true circle on it
+  // reads as an egg, so the near-far axis is compressed to compensate.
+  vec2 rv=vec2(p0.x-lampP.x, (p0.y-hz)*2.4);
+  float rd=length(rv)/(res.x*beamRadius);
+  // Its own falloff rather than beamSoft: that value is an angular edge width
+  // for the cone, and at cone-sized values the pool rim reads as a hard circle.
+  float pool=1.0-smoothstep(0.15, 1.0, rd);
 
   // Masthead guard. A moving bright wedge under body copy is the one thing here
   // that actually hurts readability, so the cone is held back inside the box and
@@ -460,12 +487,22 @@ void main(){
              : p0.x>guardBox.z ? (p0.x-guardBox.z)/fx : 0.0;
     float sy = p0.y>guardBox.w ? (p0.y-guardBox.w)/fy : 0.0;
     float away=min(1.0, max(sx,sy));
-    cone*= away+(1.0-away)*(1.0-guard);
+    float g=away+(1.0-away)*(1.0-guard);
+    cone*=g; pool*=g;
   }
   // A crest tilted toward the lamp throws light back; a trough does not. This is
   // the specular term, and it is why lit water reads as wet rather than painted.
   float facing=clamp(-dY*simGain*6.0, 0.0, 1.0);
-  vWarm=beam*beamOn*cone*(0.35+beamLift*facing)*near;
+  // The sweep and the pool are lit differently on purpose. beamOn is a blink --
+  // it ramps up, ramps down, then sits at zero for seconds between sweeps -- so
+  // anything multiplied by it is invisible most of the time. That is right for a
+  // rotating beam and wrong for the standing pool of light under the lamp, which
+  // a real lighthouse casts continuously. So the pool bypasses beamOn and the
+  // sweep still rides it; beamRound picks how much of each.
+  float shade=(0.35+beamLift*facing)*near;
+  float swept=beamOn*cone;
+  float steady=pool*beamPool;
+  vWarm=beam*mix(swept, steady, beamRound)*shade;
 
   // Near lines are drawn wider so they read as closer. This multiplies the base
   // width, so the two compound: at width 1 and DPR 2 a foreground line is already
@@ -1348,6 +1385,9 @@ function frame(now){
   gl.uniform2f(U('lampP'),CLIFF.lampX,CLIFF.lampY);
   gl.uniform1f(U('guard'),GUARD.on?P.beamGuard:0);
   gl.uniform4f(U('guardBox'),GUARD.x0,GUARD.y0,GUARD.x1,GUARD.y1);
+  gl.uniform1f(U('beamRound'),P.beamRound);
+  gl.uniform1f(U('beamRadius'),P.beamRadius);
+  gl.uniform1f(U('beamPool'),P.beamPool);
   gl.uniform1f(U('beamWidth'),P.beamWidth);
   gl.uniform1f(U('beamSoft'),P.beamSoft);
   gl.uniform1f(U('beamLift'),P.beamLift);
