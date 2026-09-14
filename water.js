@@ -610,9 +610,71 @@ varying vec4 vc;
 uniform float mul;
 void main(){ gl_FragColor=vec4(vc.rgb*vc.a*mul, vc.a*mul); }`;
 
+// The tower is a sprite rather than triangles. Built from geometry it read as a
+// flat trapezoid: at ~15x50 CSS px there isn't room for a gallery railing or
+// lantern glazing as polygons, and a single untextured fill the same value as
+// the rock behind it looks transparent -- you see the cliff edge through it.
+const VS_TEX=`
+attribute vec2 p;
+attribute vec2 t;
+uniform vec2 res;
+varying vec2 vt;
+void main(){
+  vt=t;
+  gl_Position=vec4(p.x/res.x*2.0-1.0, 1.0-p.y/res.y*2.0, 0., 1.);
+}`;
+
+const FS_TEX=`
+precision mediump float;
+varying vec2 vt;
+uniform sampler2D tex;
+uniform float haze;      // distance wash, matching what the rock gets
+uniform vec3 hazeCol;
+void main(){
+  vec4 c=texture2D(tex,vt);
+  if(c.a<0.02) discard;
+  vec3 rgb=mix(c.rgb, hazeCol, haze);
+  gl_FragColor=vec4(rgb*c.a, c.a);
+}`;
+
 const pSim=prog(VS_QUAD,FS_SIM);
 const pLine=prog(VS_LINE,FS_LINE);
 const pSolid=prog(VS_SOLID,FS_SOLID);
+const pTex=prog(VS_TEX,FS_TEX);
+
+let TOWER_TEX=null, TOWER_READY=false, TOWER_RECT=null;
+let TEXBUF=gl.createBuffer();
+(function loadTower(){
+  const img=new Image();
+  img.onload=()=>{
+    TOWER_TEX=gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D,TOWER_TEX);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,img);
+    // Non-power-of-two, so clamp and no mips. Linear min filter still gives a
+    // clean downscale from 120x480 to the ~30x100 device px it draws at.
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+    TOWER_READY=true;
+  };
+  // Missing asset just means no tower; the rest of the scene is unaffected.
+  img.onerror=()=>{ TOWER_READY=false; };
+  img.src='assets/lighthouse.png';
+})();
+
+// Screen rect for the sprite. The source art is 120x480 with the lamp centred
+// at about 12% of its height, so the rect is sized from the tower width and the
+// art's own aspect, then positioned to put that lamp point on CLIFF.lampY.
+const TOWER_ASPECT=480/120, LAMP_V=0.12;
+function towerRect(baseY){
+  const h=baseY-CLIFF.lampY;                 // lamp to base, the visible run
+  const full=h/(1-LAMP_V);                   // including the head above the lamp
+  const w=full/TOWER_ASPECT;
+  return {x:CLIFF.lampX-w/2, y:CLIFF.lampY-full*LAMP_V, w, h:full};
+}
 
 // ------------------------------------------------------------- sim state ---
 const GW=P.simW, GH=P.simH;
@@ -930,35 +992,10 @@ function buildCliff(){
     k=push(A,k, e[e.length-2],e[e.length-1], ct[0],ct[1],ct[2],1);
     k=push(A,k, W,top-(base-top)*0.03, ct[0],ct[1],ct[2],1);
 
-    // ---- opaque block ends here; the tower is opaque too, so it comes first ----
-    const tw0=CLIFF.tw, tx0=CLIFF.lampX, ty0=CLIFF.lampY;
-    // The shaft runs well down the face rather than stopping just below the mesa
-    // line. A tower whose base sits near the top of the rock has its widest,
-    // lowest part against the palest stone -- measured 101 against 110, which is
-    // no edge at all, and the base dissolves into the headland.
+    // The tower itself is a sprite, not geometry -- see TOWER_TEX. Its screen
+    // rect is worked out here so the rest of the scene can hang off it.
     const tb0=top+(base-top)*0.42;
-    // Lighter than the rock behind it: a painted tower against dark stone is the
-    // whole silhouette, and matching the rock loses it into the mesa. The gain is
-    // above the rock's own waterline haze so the separation holds all the way
-    // down the shaft, not just against the sky.
-    const TOWER=[0.031*P.rockLift*2.5, 0.047*P.rockLift*2.5, 0.071*P.rockLift*2.4, 1];
-    k=tri(A,k, tx0-tw0*0.72,tb0, tx0-tw0*0.46,ty0+tw0*0.5, tx0+tw0*0.46,ty0+tw0*0.5, TOWER);
-    k=tri(A,k, tx0-tw0*0.72,tb0, tx0+tw0*0.46,ty0+tw0*0.5, tx0+tw0*0.72,tb0, TOWER);
-    const CAP=[0.020*P.rockLift*1.5, 0.031*P.rockLift*1.5, 0.051*P.rockLift*1.5, 1];
-    // Gallery deck: a thin lip proud of the shaft, at the base of the lantern.
-    // This is the widest part of the head, which is what stops the outline
-    // reading as a chess piece -- a box narrowing to a point is a mitre.
-    const gy=ty0-tw0*0.34;
-    k=quad(A,k, tx0-tw0*0.82, gy, tw0*1.64, tw0*0.13, CAP);
-    // Lantern room: the glazed box, narrower than the deck it stands on.
-    k=quad(A,k, tx0-tw0*0.56, ty0-tw0*0.30, tw0*1.12, tw0*0.80, CAP);
-    // Cap: a shallow dome, not a spire. Three flat steps approximate the curve
-    // closely enough at this size and stay one draw call.
-    k=quad(A,k, tx0-tw0*0.62, ty0-tw0*0.44, tw0*1.24, tw0*0.14, CAP);
-    k=quad(A,k, tx0-tw0*0.48, ty0-tw0*0.56, tw0*0.96, tw0*0.12, CAP);
-    k=quad(A,k, tx0-tw0*0.28, ty0-tw0*0.65, tw0*0.56, tw0*0.09, CAP);
-    // Finial: a short mast, the one vertical the shape is allowed.
-    k=quad(A,k, tx0-tw0*0.06, ty0-tw0*0.82, tw0*0.12, tw0*0.17, CAP);
+    TOWER_RECT=towerRect(tb0);
   }
   SOLID_OPAQUE=k/6;
 
@@ -1068,6 +1105,40 @@ function tintCliff(){
   gl.bufferSubData(gl.ARRAY_BUFFER,0,SARR.subarray(0,SCOUNT*6));
 }
 
+function drawTower(){
+  if(!TOWER_READY||!TOWER_RECT||!CLIFF.on) return;
+  const r=TOWER_RECT;
+  const v=new Float32Array([
+    r.x,     r.y,      0,0,
+    r.x+r.w, r.y,      1,0,
+    r.x+r.w, r.y+r.h,  1,1,
+    r.x,     r.y,      0,0,
+    r.x+r.w, r.y+r.h,  1,1,
+    r.x,     r.y+r.h,  0,1,
+  ]);
+  gl.useProgram(pTex);
+  const U=n=>gl.getUniformLocation(pTex,n);
+  gl.uniform2f(U('res'),W,H);
+  // Same distance wash the rock gets, so the tower sits in the scene rather
+  // than on top of it.
+  gl.uniform1f(U('haze'),P.haze*0.45);
+  gl.uniform3f(U('hazeCol'),0.052,0.078,0.128);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D,TOWER_TEX);
+  gl.uniform1i(U('tex'),0);
+  gl.bindBuffer(gl.ARRAY_BUFFER,TEXBUF);
+  gl.bufferData(gl.ARRAY_BUFFER,v,gl.DYNAMIC_DRAW);
+  const pa=gl.getAttribLocation(pTex,'p'), ta=gl.getAttribLocation(pTex,'t');
+  gl.enableVertexAttribArray(pa); gl.enableVertexAttribArray(ta);
+  gl.vertexAttribPointer(pa,2,gl.FLOAT,false,16,0);
+  gl.vertexAttribPointer(ta,2,gl.FLOAT,false,16,8);
+  // Premultiplied source, drawn over the rock rather than added to it.
+  gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
+  gl.drawArrays(gl.TRIANGLES,0,6);
+  gl.blendFunc(gl.ONE,gl.ONE);      // back to the additive blend everything else uses
+  gl.disableVertexAttribArray(ta);
+}
+
 function drawCliff(){
   if(!SCOUNT) return;
   gl.useProgram(pSolid);
@@ -1085,6 +1156,14 @@ function drawCliff(){
     gl.drawArrays(gl.TRIANGLES,0,SOLID_OPAQUE);
     gl.enable(gl.BLEND);
   }
+  // Tower sprite: after the rock so it occludes it, before the additive pass so
+  // the lit glass and halo still land on top.
+  drawTower();
+  gl.useProgram(pSolid);
+  gl.bindBuffer(gl.ARRAY_BUFFER,SBUF);
+  gl.enableVertexAttribArray(pa); gl.enableVertexAttribArray(ca);
+  gl.vertexAttribPointer(pa,2,gl.FLOAT,false,24,0);
+  gl.vertexAttribPointer(ca,4,gl.FLOAT,false,24,8);
   // Additive: rim, glass, halo -- same blend the water uses.
   if(SCOUNT>SOLID_OPAQUE)
     gl.drawArrays(gl.TRIANGLES,SOLID_OPAQUE,SCOUNT-SOLID_OPAQUE);
