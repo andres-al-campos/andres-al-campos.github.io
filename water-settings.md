@@ -24,7 +24,7 @@ Which knob does what:
 
 ## v0
 
-What's currently written in `water.js`.
+The original tuning.
 
     width      1.1     widthNear  0.45
     glow       3.0     glowAmt    0.55    glowFloor  0.7
@@ -79,4 +79,4 @@ the normal waves too — not just the illuminated ones.
     dimFar     0.30    bright     0.95    crest      1.4    lines    70
 
 v3 without the `width` change, so the normal waves stay at their v0 thickness
-and only the lit ones come down. Approved.
+and only the lit ones come down. **This is what's in `water.js` now.**

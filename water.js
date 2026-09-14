@@ -117,7 +117,7 @@ const P={
   crest:1.4,          // extra gain on the sharpest crests
   glow:3.0,           // halo radius in CSS px. Exponential falloff, not coverage
   glowAmt:.55,        // its alpha. High: the halo carries the line, not the core
-  glowFloor:.7,       // how much of the halo ignores wave shading. 0 = halo
+  glowFloor:.5,     // how much of the halo ignores wave shading. 0 = halo
                       // tracks brightness (dim lines get no halo, so no edge
                       // ramp, so they look aliased); 1 = every line gets the
                       // same halo whatever its brightness.
@@ -132,7 +132,7 @@ const P={
   beamLift:1.6,       // specular gain on crests facing the lamp
   beamWarm:1.0,       // how far lit water shifts toward amber
   beamSat:.72,        // amber saturation. 1 = full amber, 0 = neutral warm-white
-  beamGain:1.6,       // extra alpha under the beam. Reads as THICKNESS, not just
+  beamGain:.7,     // extra alpha under the beam. Reads as THICKNESS, not just
                       // brightness: the halo is a Gaussian, so a brighter one
                       // stays above the visible threshold further from the
                       // centreline. Lower this to close the gap between lit and
