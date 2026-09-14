@@ -103,7 +103,7 @@ const P={
   // which is a hard edge no amount of antialiasing can fix. Measured off the
   // drawing buffer, that profile was "44 255 40": background, saturated, back.
   // Spreading the same light over a wider line leaves room for the ramp to land.
-  width:2.2, widthNear:.45, dimFar:.30, bright:.95,
+  width:1.1, widthNear:.45, dimFar:.30, bright:.95,
 
   // --- stage 3: shading -----------------------------------------------------
   // Height-based lighting glows AT the crest, which reads as a glowing ridge.
@@ -115,8 +115,8 @@ const P={
   litGamma:.75,       // <1 lifts the mid-tones, where nearly all the surface sits
   floor:.14,          // darkest a segment gets, as a fraction of full
   crest:1.4,          // extra gain on the sharpest crests
-  glow:2.2,           // width multiplier for the glow pass. 0 = no glow
-  glowAmt:.20,        // its alpha, relative to the line
+  glow:3.0,           // halo radius in CSS px. Exponential falloff, not coverage
+  glowAmt:.55,        // its alpha. High: the halo carries the line, not the core
 
   // --- stage 3: the light ---------------------------------------------------
   // A position and a sweep, standing in for the lighthouse. Where the beam lands
@@ -481,7 +481,7 @@ varying float vWarm;
 varying float vEdge;
 varying float vHalf;
 varying float vCov;
-uniform float dimFar, bright, beamWarm, beamSat, alphaMul;
+uniform float dimFar, bright, beamWarm, beamSat, alphaMul, isGlow;
 void main(){
   float a=(dimFar+(1.0-dimFar)*vNear)*bright*vLit;
 
@@ -496,7 +496,23 @@ void main(){
   // the worst of both. smoothstep rather than a linear ramp because the linear
   // one leaves visible corners in the gradient where it clamps.
   float cov=1.0-smoothstep(vHalf-0.5, vHalf+0.5, abs(vEdge));
-  a*=cov*vCov;
+
+  // The glow pass is not a wider line -- it is light spilling past the geometry,
+  // so it falls off exponentially from the centreline rather than by coverage.
+  // Reusing the coverage falloff (what this did before) draws a fat faint line
+  // with its own hard shoulder, which is why the glow never read as a glow.
+  //
+  // This is what lets the core go thin. Coverage is floored at one device pixel
+  // -- below that a line can only get fainter, and on moving water that reads as
+  // shimmer. The halo has no such floor, so it can carry the line's presence
+  // while the core sits right at the floor, opaque and sharp.
+  if(isGlow>0.5){
+    float sigma=max(0.35, vHalf*0.6);
+    float d=abs(vEdge);
+    a*=exp(-(d*d)/(2.0*sigma*sigma));
+  } else {
+    a*=cov*vCov;
+  }
 
   vec3 cool=vec3(0.56,0.71,0.85);
   // Amber, desaturated toward warm-white by beamSat. Full-saturation amber on
@@ -1166,10 +1182,12 @@ function frame(now){
   if(P.glow>0 && P.glowAmt>0){
     gl.uniform1f(U('glowW'),P.glow);   // CSS px, same space as lineW
     gl.uniform1f(U('alphaMul'),P.glowAmt);
+    gl.uniform1f(U('isGlow'),1);
     gl.drawArrays(gl.TRIANGLES,0,LCOUNT);
   }
   gl.uniform1f(U('glowW'),0);
   gl.uniform1f(U('alphaMul'),1);
+  gl.uniform1f(U('isGlow'),0);
   gl.drawArrays(gl.TRIANGLES,0,LCOUNT);
   gl.disableVertexAttribArray(la);
 

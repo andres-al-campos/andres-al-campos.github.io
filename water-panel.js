@@ -50,7 +50,7 @@ const SLIDERS=[
   ['floor',      'darkest',           0,   .6,  .01, 2],
   ['crest',      'crest gain',        1,   3,   .05, 2],
   ['glow',       'glow width',        0,   8,   .1,  1],
-  ['glowAmt',    'glow strength',     0,   .6,  .01, 2],
+  ['glowAmt',    'glow strength',     0,   1,   .01, 2],
 
   ['Light',null,null,null,null],
   ['beam',       'intensity',         0,   2,   .05, 2],
