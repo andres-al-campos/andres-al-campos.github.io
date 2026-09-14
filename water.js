@@ -668,7 +668,11 @@ let TEXBUF=gl.createBuffer();
 // Screen rect for the sprite. The source art is 120x480 with the lamp centred
 // at about 12% of its height, so the rect is sized from the tower width and the
 // art's own aspect, then positioned to put that lamp point on CLIFF.lampY.
-const TOWER_ASPECT=480/120, LAMP_V=0.12;
+// LAMP_V measured off the art, not guessed: rows 24-48 of 480 are the lantern
+// glass (narrow and bright, before the gallery deck widens at row 56), so the
+// lamp centre sits at 36/480. Getting this wrong puts the beam origin and the
+// halo off the lantern.
+const TOWER_ASPECT=480/120, LAMP_V=36/480;
 function towerRect(baseY){
   const h=baseY-CLIFF.lampY;                 // lamp to base, the visible run
   const full=h/(1-LAMP_V);                   // including the head above the lamp
@@ -920,7 +924,7 @@ function cliffEdge(){
   return pts;
 }
 
-let SBUF=gl.createBuffer(), SCOUNT=0, SOLID_OPAQUE=0;
+let SBUF=gl.createBuffer(), SCOUNT=0, SOLID_OPAQUE=0, SOLID_ROCKADD=0;
 // The sky is a background, so it draws before the water rather than with the
 // rock. Its own buffer, rebuilt with everything else on fit().
 let SKYBUF=gl.createBuffer(), SKYCOUNT=0;
@@ -957,10 +961,11 @@ function buildCliff(){
   }
 
   const HN=22;                       // halo fan segments
-  const cap=(120+HN+8)*3*6;   // rock fan + rim + tower + foot haze + halo
+  // rock fan + rim + foot haze + glass + halo (HN segments x 5 rings x 2 tris)
+  const cap=(120+8+HN*5*2)*3*6;
   if(SARR.length<cap) SARR=new Float32Array(cap);
   const A=SARR; let k=0;
-  RIM_AT=[]; GLASS_AT=[]; HALO_AT=[]; SOLID_OPAQUE=0;
+  RIM_AT=[]; GLASS_AT=[]; HALO_AT=[]; SOLID_OPAQUE=0; SOLID_ROCKADD=0;
 
   // The buffer is laid out in two blocks. The opaque one -- rock, tower, lantern
   // cap -- draws with blending off so it occludes the water; the additive one --
@@ -994,7 +999,9 @@ function buildCliff(){
 
     // The tower itself is a sprite, not geometry -- see TOWER_TEX. Its screen
     // rect is worked out here so the rest of the scene can hang off it.
-    const tb0=top+(base-top)*0.42;
+    // The sprite has its own base, so it stands on the mesa rather than running
+    // down the face the way the old geometry did.
+    const tb0=top+(base-top)*0.10;
     TOWER_RECT=towerRect(tb0);
   }
   SOLID_OPAQUE=k/6;
@@ -1029,6 +1036,12 @@ function buildCliff(){
       k=push(A,k, CLIFF.x,fb-fh,   HC[0],HC[1],HC[2],0);
     }
 
+    // ---- everything above belongs to the rock, so it draws BEFORE the tower.
+    // The foot haze is a wide band across the base of the cliff; drawn after the
+    // sprite it washes over the tower's lower half and puts the rock back in
+    // front of it.
+    SOLID_ROCKADD=k/6;
+
     // The lit glass, so the source reads as a point on the structure.
     const tw=CLIFF.tw, tx=CLIFF.lampX, ty=CLIFF.lampY;
     GLASS_AT.push(k/6,k/6+1,k/6+2,k/6+3,k/6+4,k/6+5);
@@ -1039,12 +1052,29 @@ function buildCliff(){
   if(P.beam>0 && P.haze>0){
     const rr=Math.max(8,W*0.075*P.haze);
     const cx=CLIFF.lampX, cy=CLIFF.lampY;
-    for(let i=0;i<HN;i++){
-      const a0=i/HN*TAU, a1=(i+1)/HN*TAU;
-      HALO_AT.push(k/6);
-      k=push(A,k,cx,cy,0.94,0.66,0.30,0.34*P.haze);
-      k=push(A,k,cx+Math.cos(a0)*rr,cy+Math.sin(a0)*rr,0.94,0.66,0.30,0);
-      k=push(A,k,cx+Math.cos(a1)*rr,cy+Math.sin(a1)*rr,0.94,0.66,0.30,0);
+    // Concentric rings rather than one fan. A single fan ramps alpha linearly
+    // from centre to rim, which puts the falloff's only gradient stop at the
+    // polygon edge -- so the boundary reads as a straight cut and the bloom
+    // looks faceted rather than round. Rings let the curve be exponential, and
+    // the visible edge lands where alpha is already near zero.
+    const RINGS=5;
+    const fall=(t)=>Math.exp(-3.2*t*t);      // gaussian-ish, 1 at centre, ~0 at rim
+    for(let r=0;r<RINGS;r++){
+      const t0=r/RINGS, t1=(r+1)/RINGS;
+      const r0=rr*t0, r1=rr*t1;
+      const a0v=0.34*P.haze*fall(t0), a1v=0.34*P.haze*fall(t1);
+      for(let i=0;i<HN;i++){
+        const a0=i/HN*TAU, a1=(i+1)/HN*TAU;
+        const c0=Math.cos(a0), s0=Math.sin(a0), c1=Math.cos(a1), s1=Math.sin(a1);
+        // Each vertex keeps its own base alpha, so the per-frame pulse scales
+        // the falloff instead of flattening it to a flat disc.
+        HALO_AT.push(k/6,a0v); k=push(A,k,cx+c0*r0,cy+s0*r0,0.94,0.66,0.30,a0v);
+        HALO_AT.push(k/6,a0v); k=push(A,k,cx+c1*r0,cy+s1*r0,0.94,0.66,0.30,a0v);
+        HALO_AT.push(k/6,a1v); k=push(A,k,cx+c1*r1,cy+s1*r1,0.94,0.66,0.30,a1v);
+        HALO_AT.push(k/6,a0v); k=push(A,k,cx+c0*r0,cy+s0*r0,0.94,0.66,0.30,a0v);
+        HALO_AT.push(k/6,a1v); k=push(A,k,cx+c1*r1,cy+s1*r1,0.94,0.66,0.30,a1v);
+        HALO_AT.push(k/6,a1v); k=push(A,k,cx+c0*r1,cy+s0*r1,0.94,0.66,0.30,a1v);
+      }
     }
   }
 
@@ -1100,7 +1130,8 @@ function tintCliff(){
   const lg=0.55+0.45*lit;
   for(const v of GLASS_AT) A[v*6+5]=lg;
   const pulse=P.hazeBase+(1.0-P.hazeBase)*lit;
-  for(const v of HALO_AT) A[v*6+5]=0.34*P.haze*pulse;
+  // HALO_AT is [index, baseAlpha, index, baseAlpha, ...].
+  for(let i=0;i<HALO_AT.length;i+=2) A[HALO_AT[i]*6+5]=HALO_AT[i+1]*pulse;
   gl.bindBuffer(gl.ARRAY_BUFFER,SBUF);
   gl.bufferSubData(gl.ARRAY_BUFFER,0,SARR.subarray(0,SCOUNT*6));
 }
@@ -1156,17 +1187,23 @@ function drawCliff(){
     gl.drawArrays(gl.TRIANGLES,0,SOLID_OPAQUE);
     gl.enable(gl.BLEND);
   }
-  // Tower sprite: after the rock so it occludes it, before the additive pass so
-  // the lit glass and halo still land on top.
+  // The additive block is split around the tower. Rim and foot haze belong to
+  // the rock and go under the sprite; glass and halo are the lamp and go over
+  // it. Drawn as one range, the foot haze washes across the tower and the rock
+  // reads as if it were in front.
+  const mid=SOLID_ROCKADD>0?SOLID_ROCKADD:SOLID_OPAQUE;
+  if(mid>SOLID_OPAQUE)
+    gl.drawArrays(gl.TRIANGLES,SOLID_OPAQUE,mid-SOLID_OPAQUE);
+
   drawTower();
+
   gl.useProgram(pSolid);
   gl.bindBuffer(gl.ARRAY_BUFFER,SBUF);
   gl.enableVertexAttribArray(pa); gl.enableVertexAttribArray(ca);
   gl.vertexAttribPointer(pa,2,gl.FLOAT,false,24,0);
   gl.vertexAttribPointer(ca,4,gl.FLOAT,false,24,8);
-  // Additive: rim, glass, halo -- same blend the water uses.
-  if(SCOUNT>SOLID_OPAQUE)
-    gl.drawArrays(gl.TRIANGLES,SOLID_OPAQUE,SCOUNT-SOLID_OPAQUE);
+  if(SCOUNT>mid)
+    gl.drawArrays(gl.TRIANGLES,mid,SCOUNT-mid);
   gl.disableVertexAttribArray(ca);
 }
 
