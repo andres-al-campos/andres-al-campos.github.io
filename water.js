@@ -150,7 +150,9 @@ const P={
   beamGapMax:20,      // ...and high. Randomised: a FIXED gap is still a metronome,
                       // just a sparser one, and a predictable beat behind copy
                       // pulls the eye off the text.
-  beamDouble:6,       // odds of a double sweep, 1-in-N. 0 = never
+  beamDouble:0,       // odds of a double sweep, 1-in-N. 0 = never. Off: a real
+                      // optic turns at a constant rate, so two passes close
+                      // together and then a long gap has nothing behind it.
 
   // --- stage 4: the lighthouse ----------------------------------------------
   // The structure the light comes from. With the headland on, lampX is ignored:
@@ -1312,7 +1314,9 @@ function beamStep(dt){
     // round: the optic is on a turntable and only ever turns one direction, so
     // a beam that came back the way it went would read as a searchlight being
     // aimed. What looks like a pause between passes is the arc pointing inland.
-    BEAM.phase=-1.4+2.8*k;
+    // Runs +1.4 down to -1.4: ang is measured from straight-down toward +x, so
+    // a falling phase walks the lit patch right to left across the water.
+    BEAM.phase=1.4-2.8*k;
     // Fade in and out across the pass, so it does not switch on hard.
     BEAM.on=Math.sin(Math.PI*k);
     if(beamT>=BEAM.until){
