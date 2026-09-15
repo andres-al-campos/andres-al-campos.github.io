@@ -1346,9 +1346,16 @@ function beamStep(dt){
     // round: the optic is on a turntable and only ever turns one direction, so
     // a beam that came back the way it went would read as a searchlight being
     // aimed. What looks like a pause between passes is the arc pointing inland.
-    // Runs +1.4 down to -1.4: ang is measured from straight-down toward +x, so
-    // a falling phase walks the lit patch right to left across the water.
-    BEAM.phase=1.4-2.8*k;
+    // Runs -1.4 up to +1.4: ang is measured from straight-down toward +x, so a
+    // rising phase walks the lit patch left to right across the water.
+    // Not a realism call -- real optics have no standard direction. Rotation
+    // carries no information to a mariner (a light is identified by its flash
+    // character, not its spin), and historically the direction just fell out of
+    // how a given maker's clockwork was geared. So this is chosen on reading:
+    // rightward movement reads as progress rather than retreat, and it ends the
+    // pass near the tower on the right of frame instead of dragging the eye off
+    // to the empty left side across the copy.
+    BEAM.phase=-1.4+2.8*k;
     // Fade in and out across the pass, so it does not switch on hard.
     BEAM.on=Math.sin(Math.PI*k);
     if(beamT>=BEAM.until){
