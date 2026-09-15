@@ -181,6 +181,16 @@ const P={
   // reads without the rock ever looking lit.
   rockLift:2.8,       // overall value of the rock. 1 = the old near-black
   rockHaze:.75,       // extra lift at the base, where distance haze pales it
+  // Surface texture, done in the fragment shader rather than as a bitmap. The
+  // headland is procedural -- its outline regenerates from cliffX/cliffH/
+  // cliffRough/seed on every resize -- so a PNG would have to freeze that shape,
+  // and the fan carries no UVs to paint into. Noise costs a few ALU ops on a
+  // small part of the screen and follows the geometry for free.
+  rockTex:1,          // 0 = flat vertex-gradient rock, as it was
+  rockBand:.42,       // strata contrast. Sedimentary banding, because a flat top
+                      // over a steep scarp is what flat-lying beds produce --
+                      // blocky igneous facets would fight the mesa profile.
+  rockGrain:.16,      // broad mottle under the bands, so it is not just stripes
   rim:.34,            // lit rim on the seaward edge, brightening as the lamp sweeps
   rimBase:.55,        // how much rim survives between sweeps. 0 = dark when idle
   seed:7,             // reshuffles the rock jitter. Any integer
@@ -638,16 +648,63 @@ attribute vec2 p;
 attribute vec4 c;
 uniform vec2 res;
 varying vec4 vc;
+varying vec2 vp;
 void main(){
   vc=c;
+  // Screen position through to the fragment stage. The rock is a vertex-coloured
+  // fan, so without this its interior can only ever be a smooth gradient --
+  // three verts per triangle is not enough to carry any surface detail.
+  vp=p;
   gl_Position=vec4(p.x/res.x*2.0-1.0, 1.0-p.y/res.y*2.0, 0., 1.);
 }`;
 
 const FS_SOLID=`
 precision mediump float;
 varying vec4 vc;
+varying vec2 vp;
 uniform float mul;
-void main(){ gl_FragColor=vec4(vc.rgb*vc.a*mul, vc.a*mul); }`;
+// Rock texture. Only the opaque block sets this; the additive pass (rim, lit
+// glass, halo) leaves it at 0 so those stay flat -- they are light, not surface.
+uniform float rockTex;     // 0 = off
+uniform float rockBand;    // strata contrast
+uniform float rockGrain;   // broad mottle under the bands
+uniform vec2 rockOrigin;   // cliff top-left, so the pattern is tied to the rock
+uniform float rockSpan;    // waterline minus top, for height-relative banding
+
+float h21(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
+// Value noise. Smoothstep on the lerp, so the cells do not show as a grid.
+float vnoise(vec2 p){
+  vec2 i=floor(p), f=fract(p);
+  vec2 s=f*f*(3.0-2.0*f);
+  return mix(mix(h21(i),           h21(i+vec2(1.,0.)), s.x),
+             mix(h21(i+vec2(0.,1.)),h21(i+vec2(1.,1.)), s.x), s.y);
+}
+void main(){
+  vec3 rgb=vc.rgb;
+  if(rockTex>0.0){
+    // Height up the face, 0 at the mesa top and 1 at the waterline.
+    float u=clamp((vp.y-rockOrigin.y)/max(1.0,rockSpan), 0.0, 1.0);
+    // Sedimentary strata: the mesa profile this sits on -- flat top, steep
+    // scarp, defined shoulder -- is what flat-lying beds produce, so horizontal
+    // banding is the texture that matches the shape. Bands wander and vary in
+    // thickness rather than ruling straight across, which is the difference
+    // between rock and corrugated metal.
+    float warp=vnoise(vec2(vp.x*0.012, u*3.0))*0.12;
+    float bands=vnoise(vec2(u*11.0+warp*9.0, vp.x*0.0022));
+    // Sharpened toward bed boundaries: erosion cuts at the joints between beds,
+    // so the change of value wants to sit at the edges, not spread evenly.
+    bands=smoothstep(0.25,0.75,bands);
+    // Broad mottle underneath, so the bands are not the only information and the
+    // face does not read as a stack of stripes.
+    float grain=vnoise(vec2(vp.x*0.055, vp.y*0.085))-0.5;
+    // Multiplicative, and fading toward the waterline where haze pales the rock
+    // anyway -- texture that stays crisp into the haze band breaks the depth.
+    float fade=1.0-0.55*u;
+    float t=1.0+((bands-0.5)*rockBand + grain*rockGrain)*fade;
+    rgb*=max(0.25, t);
+  }
+  gl_FragColor=vec4(rgb*vc.a*mul, vc.a*mul);
+}`;
 
 // The tower is a sprite rather than triangles. Built from geometry it read as a
 // flat trapezoid: at ~15x50 CSS px there isn't room for a gallery railing or
@@ -1205,6 +1262,9 @@ function drawSky(){
   gl.useProgram(pSolid);
   gl.uniform2f(gl.getUniformLocation(pSolid,'res'),W,H);
   gl.uniform1f(gl.getUniformLocation(pSolid,'mul'),1);
+  // Shares pSolid with the rock, and uniforms persist per program: without this
+  // the sky would pick up the rock's strata whenever it drew after the cliff.
+  gl.uniform1f(gl.getUniformLocation(pSolid,'rockTex'),0);
   gl.bindBuffer(gl.ARRAY_BUFFER,SKYBUF);
   const pa=gl.getAttribLocation(pSolid,'p'), ca=gl.getAttribLocation(pSolid,'c');
   gl.enableVertexAttribArray(pa); gl.enableVertexAttribArray(ca);
@@ -1280,11 +1340,19 @@ function drawCliff(){
   gl.enableVertexAttribArray(pa); gl.enableVertexAttribArray(ca);
   gl.vertexAttribPointer(pa,2,gl.FLOAT,false,24,0);
   gl.vertexAttribPointer(ca,4,gl.FLOAT,false,24,8);
-  // Opaque: blending off, so the rock actually hides the water behind it.
+  // Opaque: blending off, so the rock actually hides the water behind it. This
+  // is the only range that gets the rock texture -- the additive block after it
+  // is light rather than surface, so it stays flat.
   if(SOLID_OPAQUE>0){
+    gl.uniform1f(U('rockTex'),P.rockTex>0?1:0);
+    gl.uniform1f(U('rockBand'),P.rockTex*P.rockBand);
+    gl.uniform1f(U('rockGrain'),P.rockTex*P.rockGrain);
+    gl.uniform2f(U('rockOrigin'),CLIFF.x,CLIFF.top);
+    gl.uniform1f(U('rockSpan'),Math.max(1,CLIFF.base-CLIFF.top));
     gl.disable(gl.BLEND);
     gl.drawArrays(gl.TRIANGLES,0,SOLID_OPAQUE);
     gl.enable(gl.BLEND);
+    gl.uniform1f(U('rockTex'),0);
   }
   // The additive block is split around the tower. Rim and foot haze belong to
   // the rock and go under the sprite; glass and halo are the lamp and go over
