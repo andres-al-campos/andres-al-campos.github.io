@@ -1,4 +1,4 @@
-lighthouse.png
+lighthouse-v3.png
 
 Derived from "Lighthouse.svg" by matthewg42 (2008), released into the public
 domain by the author. Source:
@@ -6,3 +6,13 @@ https://commons.wikimedia.org/wiki/File:Lighthouse.svg
 
 Recoloured to the scene's night palette and downscaled to 120x480 (4x the
 rendered size, so it stays sharp on retina).
+
+The lantern room -- rows 0-74: finial, roof, glazing, gallery deck, railing --
+is erased to transparent. At render size that housing is about 20x17 px and
+reads as a bright rectangular window frame around the light, which is what made
+the lamp look square. The lamp is drawn as disc geometry in water.js instead,
+and LAMP_V=75/480 puts it at the top of the remaining shaft.
+
+The filename carries a version because the browser's image cache keys on URL
+and holds a decoded copy that survives reloads and server restarts; editing the
+art in place shows the old sprite indefinitely.

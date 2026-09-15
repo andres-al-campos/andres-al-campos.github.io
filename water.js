@@ -127,7 +127,7 @@ const P={
   // the water lifts and warms; elsewhere it keeps the cool base colour.
   beam:1.0,           // master intensity. 0 = off
   lampX:.42,          // where the lamp sits across the screen, 0..1
-  beamRound:1,        // 0 = swept cone, 1 = circular pool under the lamp.
+  beamRound:0,        // 0 = swept cone, 1 = circular pool under the lamp.
                       // Blends, so values between give a cone that never fully
                       // leaves the pool.
   beamRadius:.34,     // pool radius as a fraction of canvas width. Only used
@@ -699,17 +699,25 @@ let TEXBUF=gl.createBuffer();
   };
   // Missing asset just means no tower; the rest of the scene is unaffected.
   img.onerror=()=>{ TOWER_READY=false; };
-  img.src='assets/lighthouse.png';
+  // Versioned filename rather than a query string: the browser's image cache
+  // keys on the URL and holds a decoded copy that survives reloads and even a
+  // server restart, so editing the art in place shows the old sprite forever.
+  img.src='assets/lighthouse-v3.png';
 })();
 
 // Screen rect for the sprite. The source art is 120x480 with the lamp centred
 // at about 12% of its height, so the rect is sized from the tower width and the
 // art's own aspect, then positioned to put that lamp point on CLIFF.lampY.
-// LAMP_V measured off the art, not guessed: rows 24-48 of 480 are the lantern
+// The art's lantern room (rows 0-74: finial, roof, glazing, gallery, railing)
+// is erased. At render size that housing is ~20x17 px and reads as a bright
+// rectangular window frame, which is exactly what made the lamp look square --
+// the round glow was always there, framed inside a box. The lamp is drawn as
+// geometry instead, so LAMP_V sits at the top of the remaining shaft.
+// Previously: rows 24-48 of 480 are the lantern
 // glass (narrow and bright, before the gallery deck widens at row 56), so the
 // lamp centre sits at 36/480. Getting this wrong puts the beam origin and the
 // halo off the lantern.
-const TOWER_ASPECT=480/120, LAMP_V=36/480;
+const TOWER_ASPECT=480/120, LAMP_V=75/480;
 function towerRect(baseY){
   const h=baseY-CLIFF.lampY;                 // lamp to base, the visible run
   const full=h/(1-LAMP_V);                   // including the head above the lamp
@@ -998,8 +1006,9 @@ function buildCliff(){
   }
 
   const HN=22;                       // halo fan segments
-  // rock fan + rim + foot haze + glass + halo (HN segments x 5 rings x 2 tris)
-  const cap=(120+8+HN*5*2)*3*6;
+  const GN=16;                       // lamp glass disc segments
+  // rock fan + rim + foot haze + glass (GN tris) + halo (HN x 5 rings x 2 tris)
+  const cap=(120+8+GN+HN*5*2)*3*6;
   if(SARR.length<cap) SARR=new Float32Array(cap);
   const A=SARR; let k=0;
   RIM_AT=[]; GLASS_AT=[]; HALO_AT=[]; SOLID_OPAQUE=0; SOLID_ROCKADD=0;
@@ -1079,10 +1088,29 @@ function buildCliff(){
     // front of it.
     SOLID_ROCKADD=k/6;
 
-    // The lit glass, so the source reads as a point on the structure.
+    // The lit glass, so the source reads as a point on the structure. A disc
+    // rather than a quad: at this size a rectangle reads as a lit window, and
+    // the thing it has to look like is a lamp.
     const tw=CLIFF.tw, tx=CLIFF.lampX, ty=CLIFF.lampY;
-    GLASS_AT.push(k/6,k/6+1,k/6+2,k/6+3,k/6+4,k/6+5);
-    k=quad(A,k, tx-tw*0.38, ty-tw*0.22, tw*0.76, tw*0.62, [1,0.871,0.659,1]);
+    // Sized against the sprite's own lantern room (~0.32 of the art's width),
+    // not a fraction of the tower: smaller than that and the painted box shows
+    // around it and the lamp reads square again.
+    // Drawn in the additive block, so a disc at full alpha saturates to white
+    // across its whole area and clips flat -- the round edge is still in the
+    // geometry but nothing of it survives, and what you see is a hard slab. So
+    // the rim alpha falls to zero and only the centre is near full, which keeps
+    // the sum inside range and lets the circle actually read as a circle.
+    const gr=tw*0.55;
+    for(let i=0;i<GN;i++){
+      const a0=i/GN*TAU, a1=(i+1)/GN*TAU;
+      const x0=tx+Math.cos(a0)*gr, y0=ty+Math.sin(a0)*gr;
+      const x1=tx+Math.cos(a1)*gr, y1=ty+Math.sin(a1)*gr;
+      // centre vertex carries the light, rim vertices carry none
+      GLASS_AT.push(k/6);
+      k=push(A,k, tx,ty, 1,0.871,0.659, 1);
+      k=push(A,k, x0,y0, 1,0.871,0.659, 0);
+      k=push(A,k, x1,y1, 1,0.871,0.659, 0);
+    }
   }
 
   // Halo around the lamp. Only a bloom at the source -- see the note on `haze`.
