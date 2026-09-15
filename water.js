@@ -950,21 +950,49 @@ function cliffEdge(){
   // Face: a steep scarp, not a dome. Nearly vertical for most of the rise so the
   // top arrives as a defined shoulder -- that break is what reads as a mesa. A
   // gentler curve here rounds it into a hill.
-  const FN=9;
+  const FN=26;
   for(let i=0;i<=FN;i++){
     const u=i/FN;
     // Batter: the face leans back as it rises, jittered along its whole length
     // rather than only near the top, so it reads as broken rock not a cut edge.
-    const x=x0+span*(0.16*u)+span*0.030*rough*(rk(i)-0.5);
-    const y=base+(top-base)*Math.pow(u,0.40)+(base-top)*0.055*rough*(rk(i+40)-0.5);
+    // Same two-scale break as the mesa top, and for the same reason -- the old
+    // single term came out under 2px and the scarp measured as a clean curve.
+    // Same smoothed coarse sampling as the mesa top, and for the same reason.
+    const ci=i/4, cf=ci-Math.floor(ci), s=cf*cf*(3-2*cf), b=Math.floor(ci);
+    const lerp=(o)=>{const a=rk(b+o),z=rk(b+1+o);return (a+(z-a)*s)-0.5;};
+    const cx=lerp(0)*0.085, fx=(rk(i+140)-0.5)*0.024;
+    const x=x0+span*(0.16*u)+span*rough*(cx+fx);
+    const cy=lerp(40)*0.14, fy=(rk(i+180)-0.5)*0.05;
+    // Fades out at the waterline: the foot is where haze pales the rock anyway,
+    // and a jagged silhouette there fights the footHaze band.
+    const fade=Math.min(1.0,u*3.0);
+    const y=base+(top-base)*Math.pow(u,0.40)+(base-top)*rough*(cy+fy)*fade;
     pts.push(x,y);
   }
-  // Mesa top: flat, tilting very slightly inland, with small breaks only.
-  const TN=6;
+  // Mesa top: flat overall, tilting very slightly inland, but broken along its
+  // length. The skyline is the only part of the headland with a hard edge
+  // against the sky, so it carries the whole read of "rock" -- at 6 segments and
+  // 0.022 of the cliff height the break came out around 1.5px on a 1500px
+  // canvas, which measured as a straight line and looked like a table edge.
+  // Two scales rather than one: a coarse term for the boulders that actually
+  // break the outline, and a fine term so the segments between them are not
+  // themselves straight. One scale at any amplitude reads as a wobble.
+  const TN=34;
   for(let i=0;i<=TN;i++){
     const u=i/TN;
     const x=x0+span*(0.16+0.84*u);
-    const y=top-(base-top)*0.03*u+(base-top)*0.022*rough*rk(i+90);
+    // Interpolated between integer samples rather than indexed at i*0.5: that
+    // hash returns near-identical values for adjacent half-steps, so pairs of
+    // vertices shared a height and the outline came out as a regular staircase
+    // of flat treads. Lerping gives sloped facets between the coarse samples.
+    const ci=i/4, c0=rk(Math.floor(ci)+90), c1=rk(Math.floor(ci)+91);
+    const cf=ci-Math.floor(ci);
+    const coarse=((c0+(c1-c0)*(cf*cf*(3-2*cf)))-0.5)*0.17;
+    const fine=(rk(i+300)-0.5)*0.055;
+    // Settles toward flat at the inland end so the mesa still reads as a mesa
+    // and the roughness does not march off the right edge of frame.
+    const taper=1.0-0.45*u;
+    const y=top-(base-top)*0.03*u+(base-top)*rough*(coarse+fine)*taper;
     pts.push(x,y);
   }
   pts.push(W, top-(base-top)*0.03);
@@ -1009,8 +1037,12 @@ function buildCliff(){
 
   const HN=22;                       // halo fan segments
   const GN=16;                       // lamp glass disc segments
-  // rock fan + rim + foot haze + glass (GN tris) + halo (HN x 5 rings x 2 tris)
-  const cap=(120+8+GN+HN*5*2)*3*6;
+  // Sized off the outline actually returned, not a constant: the fan spends one
+  // triangle per edge segment and the rim two, so raising the segment counts in
+  // cliffEdge() silently overflowed a fixed cap and dropped geometry.
+  const ES=Math.max(0,(CLIFF.on?cliffEdge().length/2:0)-1);
+  // rock fan (ES) + rim (ES x 2) + foot haze + glass (GN) + halo (HN x 5 x 2)
+  const cap=(ES*3+8+GN+HN*5*2)*3*6;
   if(SARR.length<cap) SARR=new Float32Array(cap);
   const A=SARR; let k=0;
   RIM_AT=[]; GLASS_AT=[]; HALO_AT=[]; SOLID_OPAQUE=0; SOLID_ROCKADD=0;
