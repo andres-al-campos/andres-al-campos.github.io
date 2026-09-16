@@ -24,7 +24,7 @@ const PROJECTS = [
     tagline: "Break tasks down until the leaves are small enough to do.",
     blurb:
       "A to-do list where a task is a tree and progress rolls up from the leaves, so every branch shows how far along it is. On web, iOS, and desktop, all against the same tree.",
-    tags: ["TypeScript", "React", "Swift", "Electron", "Cloudflare Workers", "MCP"],
+    tags: ["TypeScript", "React", "Swift", "Electron", "Cloudflare Workers", "SQLite", "MCP"],
     repo: "https://github.com/andres-al-campos/Ansa",
   },
   {
@@ -41,7 +41,7 @@ const PROJECTS = [
     tagline: "Find the company whose Glassdoor reviews are real.",
     blurb:
       "Almost anything above 4.0 has had a review push behind it, so the average alone proves nothing. Winnow scores the shape of the distribution instead, adding signals Glassdoor exposes and Google Maps does not: ex-employee against current-employee sentiment, sub-rating coherence, and how the rating moved over time.",
-    tags: ["Python", "CLI", "sentiment analysis", "scraping"],
+    tags: ["Python", "CLI", "SQLite", "sentiment analysis", "scraping"],
     repo: "https://github.com/andres-al-campos/Winnow",
   },
   {
