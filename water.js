@@ -177,8 +177,10 @@ const P={
   starTextPad:7,      // px of clearance kept around each text line box
   starMinGap:26,      // px minimum separation, so rejected stars do not pile up
                       // in the few open gaps between lines
-  stars:3.4,          // master brightness. 0 = none. Positions and magnitudes
+  stars:2,            // master brightness. 0 = none. Positions and magnitudes
                       // come from buildStars; this only scales them.
+                      // 2 is the point where they read as present without
+                      // pulling attention off the copy.
   sky:.16,            // lift of the sky band above the flat ground. 0 = no sky.
                       // Floor is about .15: below that the sky falls under the
                       // rock and the headland silhouette inverts (measured at
