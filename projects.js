@@ -14,7 +14,7 @@ const PROJECTS = [
     name: "WebTime",
     tagline: "Track and take control of your time.",
     blurb:
-      "A Firefox extension that breaks browsing into sessions instead of daily totals. It warns before a limit rather than at it: a visual pulse early, a popup as you approach your usual amount, a 60-second wind-down near the end. The blocks are loose enough that I still have it installed.",
+      "A Firefox extension that tracks where your time goes, by session and by day. The limits are strict enough to actually lower usage and loose enough that you keep the extension installed, which most blockers get wrong in one direction or the other. It warns before a limit rather than at it.",
     tags: ["Firefox extension", "TypeScript"],
     repo: "https://github.com/andres-al-campos/WebTime",
     image: "img/webtime.png",
@@ -23,8 +23,8 @@ const PROJECTS = [
     name: "Ansa",
     tagline: "Break tasks down until the leaves are small enough to do.",
     blurb:
-      "An outliner where a task is a tree and progress rolls up from the leaves, so a branch shows how far along it is. The React app and an MCP server are peer clients of the same API, which means a Claude and a person can edit the same tree at once and both see it change.",
-    tags: ["React", "TypeScript", "Cloudflare Workers", "MCP"],
+      "A to-do list where a task is a tree and progress rolls up from the leaves, so every branch shows how far along it is. On web, iOS, and desktop, all against the same tree. An agent can hold the other end over MCP and edit alongside you, live.",
+    tags: ["web", "iOS", "desktop", "MCP"],
     repo: "https://github.com/andres-al-campos/Ansa",
   },
   {
@@ -64,7 +64,7 @@ const PROJECTS = [
     name: "Etymon",
     tagline: "Find the word that connects a set of words.",
     blurb:
-      "Give it cat and lion and it walks a graph of GloVe embeddings to find the words sitting close to both. Two searches run in parallel, a fast set intersection and a best-first traversal, and every result shows the path it walked to get there.",
+      "Give it cat and lion and it finds the words sitting close to both, then shows the path it walked to get there: lion, leopard, cats. Useful for naming a category, brainstorming, or word games.",
     tags: ["Python", "embeddings", "graph search"],
     repo: "https://github.com/andres-al-campos/Etymon",
   },
