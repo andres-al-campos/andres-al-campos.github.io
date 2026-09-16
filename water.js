@@ -1457,26 +1457,35 @@ function buildStars(){
     }
     return false;
   };
-  let n=0, guard=0;
+  // Per-band quotas rather than a biased random draw. A pow() bias on a uniform
+  // draw gives the right average gradient but not a reliable one: the first
+  // attempt produced 21/9/2/10 across the four quarters, so the third band was
+  // nearly empty and the bottom one clustered -- the gradient had a hole in it.
+  // Fixed counts per band cannot do that. They still thin downward, just
+  // monotonically.
   const want=Math.min(P.starN,64);
-  while(n<want && guard<20000){
-    guard++;
-    const x=rnd();
-    // Biased upward so density falls off toward the waterline. pow>1 on a
-    // uniform draw concentrates toward 0, which is the top of the band.
-    const y=Math.pow(rnd(), 1.6);
-    if(hit(x*W, y*hz)) continue;
-    // Keep a minimum separation so retries do not pile candidates into the few
-    // open gaps between lines.
-    let tooClose=false;
-    for(let k=0;k<n;k++){
-      const dx=(STARS.tab[k*3]-x)*W, dy=(STARS.tab[k*3+1]-y)*hz;
-      if(dx*dx+dy*dy < P.starMinGap*P.starMinGap){ tooClose=true; break; }
+  const QUOTA=[0.38,0.29,0.19,0.14];   // top quarter to bottom, sums to 1
+  let n=0;
+  for(let band=0; band<4; band++){
+    const target=band===3 ? want-n : Math.round(want*QUOTA[band]);
+    let placed=0, guard=0;
+    while(placed<target && n<want && guard<6000){
+      guard++;
+      const x=rnd();
+      const y=(band+rnd())*0.25;
+      if(hit(x*W, y*hz)) continue;
+      // Keep a minimum separation so retries do not pile candidates into the
+      // few open gaps between lines.
+      let tooClose=false;
+      for(let k=0;k<n;k++){
+        const dx=(STARS.tab[k*3]-x)*W, dy=(STARS.tab[k*3+1]-y)*hz;
+        if(dx*dx+dy*dy < P.starMinGap*P.starMinGap){ tooClose=true; break; }
+      }
+      if(tooClose) continue;
+      STARS.tab[n*3]=x; STARS.tab[n*3+1]=y;
+      STARS.tab[n*3+2]=1.2+rnd()*1.2;   // magnitude 1.2 - 2.4
+      n++; placed++;
     }
-    if(tooClose) continue;
-    STARS.tab[n*3]=x; STARS.tab[n*3+1]=y;
-    STARS.tab[n*3+2]=1.2+rnd()*1.2;   // magnitude 1.2 - 2.4
-    n++;
   }
   STARS.n=n;
 }
