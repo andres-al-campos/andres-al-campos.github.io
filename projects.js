@@ -32,7 +32,7 @@ const PROJECTS = [
     tagline: "Find the company whose Glassdoor reviews are real.",
     blurb:
       "Almost anything above 4.0 has had a review push behind it, so the average alone proves nothing. Winnow scores the shape of the distribution instead, adding signals Glassdoor exposes and Google Maps does not: ex-employee against current-employee sentiment, sub-rating coherence, and how the rating moved over time.",
-    tags: ["Python", "CLI"],
+    tags: ["Python", "CLI", "statistics"],
     repo: "https://github.com/andres-al-campos/Winnow",
   },
   {
@@ -40,7 +40,7 @@ const PROJECTS = [
     tagline: "Read Google Maps reviews with a skeptical eye.",
     blurb:
       "A Firefox extension that pulls every review for a location and scores it for the marks of a bought one, starting with a bimodal star distribution: a pile of fives and a pile of ones averaging to a respectable 4.2. Built for apartment hunting, and it ranks places side by side once you have gathered a few.",
-    tags: ["JavaScript", "Firefox extension"],
+    tags: ["JavaScript", "Firefox extension", "statistics"],
     repo: "https://github.com/andres-al-campos/Momus",
     image: "img/momus.png",
   },
@@ -57,7 +57,7 @@ const PROJECTS = [
     tagline: "Sleep measured, not scored.",
     blurb:
       "Lying awake looks identical to deep sleep on an accelerometer, so most sleep scores are confident about something they cannot know. Somnya senses movement, breathing, and heartbeat overnight, then labels every stat with how much it can stand behind it: sensor fact, honest estimate, or not enough data.",
-    tags: ["Swift", "iOS"],
+    tags: ["Swift", "iOS", "signal processing"],
     repo: "https://github.com/andres-al-campos/Somnya",
   },
   {
@@ -65,7 +65,7 @@ const PROJECTS = [
     tagline: "Find the word that connects a set of words.",
     blurb:
       "Give it cat and lion and it finds the words sitting close to both, then shows the path it walked to get there: lion, leopard, cats. Useful for naming a category, brainstorming, or word games.",
-    tags: ["Python", "web"],
+    tags: ["Python", "web", "embeddings"],
     repo: "https://github.com/andres-al-campos/Etymon",
   },
   {
