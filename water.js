@@ -1822,6 +1822,9 @@ function frame(now){
 // runs the renderer.
 WATER.P=P; WATER.DEF=FILE_DEF; WATER.fit=fit;
 WATER.buildLines=buildLines; WATER.buildCliff=buildCliff;
+// Clears the cached star table so the next frame regenerates it. The panel
+// needs this because positions are built once and then frozen.
+WATER.rebuildStars=()=>{ STARS.n=0; };
 
 // Three clicks on the lantern open the tuning panel. Nothing links to it -- the
 // lamp is the only part of the scene small and deliberate enough that hitting it

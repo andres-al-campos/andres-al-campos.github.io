@@ -93,6 +93,13 @@ const SLIDERS=[
   ['haze',       'lamp halo',         0,   1.2, .02, 2],
   ['seed',       'rock seed',         1,   40,  1,   0],
 
+  ['Stars',null,null,null,null],
+  ['stars',      'star brightness',   0,   6,   .1,  1],
+  ['starN',      'star count',        0,   64,  1,   0],
+  ['starSeed',   'star seed',         1,   40,  1,   0],
+  ['starTextPad','clear of text (px)',0,   24,  1,   0],
+  ['starMinGap', 'min spacing (px)',  4,   60,  1,   0],
+
   ['Framing',null,null,null,null],
   ['horizon',    'horizon',           .15, .6,  .01, 2],
   ['persp',      'perspective',       1,   3,   .05, 2],
@@ -141,6 +148,11 @@ const SKEY='water.presets';    // named checkpoints, {name: diff-from-file}
 // rebuilt; the headland is baked at fit() time, so its shape params rebuild that.
 // Everything else is a uniform and takes effect next frame.
 const rebuildOn={lines:1, ptStep:1};
+// Star positions are generated once at load, so anything that changes WHERE
+// they go has to clear the cached table and let the next frame rebuild it.
+// starN is in here too: the count is baked into the table, not read per frame.
+// Plain brightness (stars) is a uniform and is deliberately absent.
+const starsOn={starN:1, starSeed:1, starTextPad:1, starMinGap:1};
 const cliffOn={sky:1, rockLift:1, rockHaze:1, footHaze:1, cliff:1, cliffX:1,
                cliffH:1, cliffRough:1, towerH:1, towerW:1, lampPos:1, seed:1, haze:1,
                beam:1, lampX:1, horizon:1};
@@ -185,6 +197,7 @@ for(const [k,lab,lo,hi,step,dp] of SLIDERS){
     out.textContent=(+P[k]).toFixed(dp);
     if(rebuildOn[k] && WATER.buildLines) WATER.buildLines();
     if(cliffOn[k] && WATER.buildCliff) WATER.buildCliff();
+    if(starsOn[k] && WATER.rebuildStars) WATER.rebuildStars();
     savePanel();
   });
 }
