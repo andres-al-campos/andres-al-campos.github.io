@@ -74,8 +74,12 @@ main {
   padding-bottom: clamp(72px, 10vw, 140px);
   /* The hero ends flush against the grid otherwise -- the first card starts the
      instant the water stops. This is a section break, not a card gap, so it is
-     deliberately larger than the grid's own gutter. */
-  margin-top: clamp(40px, 6vw, 72px);
+     deliberately larger than the grid's own gutter.
+     Kept small, though: the gap is dead space at the fold, and every pixel here
+     is one the first card does not peek through by. At the old 6vw/72px the
+     cards cleared the viewport by under 60px and the fold read as a hard stop
+     rather than as something continuing below. */
+  margin-top: clamp(18px, 2.6vw, 34px);
 }
 
 /* ---- masthead ---- */
