@@ -65,7 +65,7 @@ const PROJECTS = [
     tagline: "Find the word that connects a set of words.",
     blurb:
       "Give it cat and lion and it finds the words sitting close to both, then shows the path it walked to get there: lion, leopard, cats. Useful for naming a category, brainstorming, or word games.",
-    tags: ["Python", "local server", "CLI", "embeddings"],
+    tags: ["Python", "local server", "CLI", "embeddings", "graph search"],
     repo: "https://github.com/andres-al-campos/Etymon",
   },
   {
