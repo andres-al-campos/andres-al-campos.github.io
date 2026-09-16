@@ -72,7 +72,7 @@ const PROJECTS = [
     name: "ReSign",
     tagline: "Keep sideloaded iOS apps from expiring.",
     blurb:
-      "A macOS menu bar app that watches your Xcode projects and tracks when each signature runs out, then rebuilds and reinstalls to your iPhone two hours before it does. It checks again every time the Mac wakes, so an app is never dead when you reach for it.",
+      "Sideloaded apps stop opening when their signature runs out, usually on the morning you need one. ReSign watches your Xcode projects from the menu bar and rebuilds and reinstalls to your iPhone two hours before that happens, and checks again every time the Mac wakes.",
     tags: ["Swift", "macOS"],
     repo: "https://github.com/andres-al-campos/ReSign",
   },
@@ -80,8 +80,8 @@ const PROJECTS = [
     name: "Sundial",
     tagline: "Schedule your monitor's brightness by time of day.",
     blurb:
-      "A macOS menu bar app that holds a set of brightness and contrast presets and applies them on a schedule, so you never reach for the buttons on the monitor itself again. It drives the real backlight over DDC rather than dimming with an overlay, eases each change in over a minute, and puts the setting back whenever the display drifts.",
-    tags: ["Swift", "macOS"],
+      "A macOS menu bar app that holds a set of brightness and contrast presets and moves between them through the day, easing each change in over a minute. Bright enough to work by at noon, dim enough to sit with at midnight, and you never touch the buttons on the monitor to get there.",
+    tags: ["Swift", "macOS", "DDC"],
     repo: "https://github.com/andres-al-campos/Sundial",
   },
 ];
