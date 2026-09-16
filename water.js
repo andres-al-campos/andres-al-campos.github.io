@@ -63,7 +63,7 @@ const P={
 
   // --- the simulation (values carried over from water.js, already tuned) ---
   simW:340, simH:210,
-  simGain:4,
+  simGain:5,
   stiff:1.85,         // hard CFL ceiling at 2.0; see water.js
   breakAt:.0008,      // squared-slope threshold where a crest starts to break
   breakRate:6,        // how hard excess steepness is bled off
@@ -103,7 +103,15 @@ const P={
   // which is a hard edge no amount of antialiasing can fix. Measured off the
   // drawing buffer, that profile was "44 255 40": background, saturated, back.
   // Spreading the same light over a wider line leaves room for the ramp to land.
-  width:1.1, widthNear:.45, dimFar:.30, bright:.95,
+  // Aliasing is a contrast problem, not a coverage one: a bright hairline on a
+  // dark ground is a tall value step across a sub-pixel edge, and the halo is
+  // then trying to smooth a jump too big for it. Dimming the far lines and
+  // pulling overall brightness down shortens the step itself.
+  // Horizon alpha is just dimFar*bright (vNear goes to 0 there), so dimFar moves
+  // the far rows without touching the near ones. .20 read as too faint at the
+  // skyline; .26 restores most of it and still sits under the .285 that was
+  // aliasing.
+  width:1.1, widthNear:0, dimFar:.26, bright:.82,
 
   // --- stage 3: shading -----------------------------------------------------
   // Height-based lighting glows AT the crest, which reads as a glowing ridge.
@@ -146,7 +154,7 @@ const P={
                       // unlit lines. Width goes as the log of the gain, so it
                       // moves slower than the number suggests.
   beamSweep:2.0,      // seconds for one crossing
-  beamGapMin:8,       // seconds of dark between sweeps, low end...
+  beamGapMin:4,       // seconds of dark between sweeps, low end...
   beamGapMax:20,      // ...and high. Randomised: a FIXED gap is still a metronome,
                       // just a sparser one, and a predictable beat behind copy
                       // pulls the eye off the text.
@@ -158,21 +166,28 @@ const P={
   // The structure the light comes from. With the headland on, lampX is ignored:
   // the lamp rides the top of the tower, so the glare path on the water converges
   // on the light the viewer can actually see rather than on a floating point.
-  sky:.55,            // lift of the sky band above the flat ground. 0 = no sky.
+  sky:.16,            // lift of the sky band above the flat ground. 0 = no sky.
+                      // Floor is about .15: below that the sky falls under the
+                      // rock and the headland silhouette inverts (measured at
+                      // .10 -- rock 36, sky 34).
                       // Not decoration: the rock is near-black, so without a
                       // lighter band behind it the headland has nothing to read
                       // against and simply vanishes.
   cliff:1,            // draw the headland. 0 = open water, lamp sits on the horizon
-  cliffX:.70,         // where the cliff face meets the horizon, 0..1
-  cliffH:.085,        // mesa top above the horizon, as a fraction of height
-  cliffRough:.55,     // how broken the face and top edge are. 0 = clean
-  towerH:.115,        // tower height above the mesa, fraction of height. This
+  cliffX:.76,         // where the cliff face meets the horizon, 0..1
+  cliffH:.085,        // mesa top above the horizon, as a fraction of height.
+                      // Floor is about .06: below that the mesa is thinner than
+                      // the foot-haze band plus the tower base and reads as a
+                      // lump rather than land. .08-.10 is the plausible range for
+                      // a flat-topped headland seen from this distance.
+  cliffRough:.60,     // how broken the face and top edge are. 0 = clean
+  towerH:.13,         // tower height above the mesa, fraction of height. This
                       // scales the whole sprite, since its width follows from
                       // the art's aspect ratio.
   towerW:.0155,       // tower width, fraction of screen width. Only the lit
                       // glass and halo size off this now -- the sprite's own
                       // width comes from towerH and the art's aspect ratio.
-  lampPos:.30,        // where the tower stands on the mesa, 0 = seaward edge,
+  lampPos:.19,        // where the tower stands on the mesa, 0 = seaward edge,
                       // 1 = off the right of frame. Real lighthouses sit out on
                       // the point, not back on the headland.
   // The headland is the nearest solid thing in frame, and at night the sky is
@@ -180,29 +195,37 @@ const P={
   // sky gives about 1.4:1 and simply vanishes; this lifts it until the outline
   // reads without the rock ever looking lit.
   rockLift:2.8,       // overall value of the rock. 1 = the old near-black
-  rockHaze:.75,       // extra lift at the base, where distance haze pales it
+  rockHaze:.10,       // extra lift at the base, where distance haze pales it.
+                      // Near zero on purpose: at .75 the wash swamped the lower
+                      // two-thirds of the face and flattened the texture out.
   // Surface texture, done in the fragment shader rather than as a bitmap. The
   // headland is procedural -- its outline regenerates from cliffX/cliffH/
   // cliffRough/seed on every resize -- so a PNG would have to freeze that shape,
   // and the fan carries no UVs to paint into. Noise costs a few ALU ops on a
   // small part of the screen and follows the geometry for free.
   rockTex:1,          // 0 = flat vertex-gradient rock, as it was
-  rockBand:.42,       // strata contrast. Sedimentary banding, because a flat top
-                      // over a steep scarp is what flat-lying beds produce --
-                      // blocky igneous facets would fight the mesa profile.
-  rockGrain:.16,      // broad mottle under the bands, so it is not just stripes
-  rim:.34,            // lit rim on the seaward edge, brightening as the lamp sweeps
-  rimBase:.55,        // how much rim survives between sweeps. 0 = dark when idle
-  seed:7,             // reshuffles the rock jitter. Any integer
+  // Grain-dominant rather than band-dominant. Strata are a directional PATTERN,
+  // and a pattern is what pulls the eye -- at this size it either reads as
+  // stripes or reads as nothing. Undirected mottle just breaks up the surface so
+  // it stops looking poured, which is all that is wanted here.
+  rockBand:.10,       // strata contrast. Low: a hint of bedding, not stripes
+  rockGrain:.30,      // broad mottle under the bands, so it is not just stripes
+  // The attention-grab is the DELTA, not the peak. hazeBase and rimBase are both
+  // floors at 0, so the lamp and rim go fully dark between sweeps and the sweep
+  // itself is the whole event -- raising haze/rim would only lift both states
+  // together and flatten it.
+  rim:.30,            // lit rim on the seaward edge, brightening as the lamp sweeps
+  rimBase:0,          // how much rim survives between sweeps. 0 = dark when idle
+  seed:11,            // reshuffles the rock jitter. Any integer
   // A halo, not a shaft. In clear air a beam is invisible from the side and shows
   // only where it lands; the solid cone-in-the-sky is a fog effect, and drawing it
   // is what makes stylised lighthouses read as cartoons.
-  haze:.52,           // glow bloom around the lamp itself. 0 = bare point
-  hazeBase:.60,       // how much halo survives between sweeps. 0 = dark when idle
+  haze:.18,           // glow bloom around the lamp itself. 0 = bare point
+  hazeBase:0,         // how much halo survives between sweeps. 0 = dark when idle
   // Where the rock meets the sea there is nothing marking the line, so the two
   // dark masses run together. A thin pale band separates them the way real
   // distance haze does at a waterline.
-  footHaze:.42,       // brightness of the band at the cliff foot. 0 = none
+  footHaze:.22,       // brightness of the band at the cliff foot. 0 = none
   // The beam sweeps behind the hero copy, and a moving bright wedge under text is
   // the one thing that actually hurts readability here. This holds it back.
   beamGuard:1.0,      // 0 = no guard, 1 = beam fully suppressed behind the copy
@@ -679,6 +702,25 @@ float vnoise(vec2 p){
   return mix(mix(h21(i),           h21(i+vec2(1.,0.)), s.x),
              mix(h21(i+vec2(0.,1.)),h21(i+vec2(1.,1.)), s.x), s.y);
 }
+// Seven stars, at the limiting magnitude of early twilight.
+//
+// Magnitudes, not arbitrary brightnesses. The scale is 2.512x flux per step, and
+// counts rise about 3x per magnitude, so a limit near mag 2 leaves single digits
+// over a window this size and the sample is steeply top-heavy: one clear leader,
+// two seconds, four marginal. Equal-brightness dots are the main tell of a fake
+// twilight sky, so the spread matters more than the placement.
+//
+// Positions are fixed rather than hashed. At n=7 the galactic-plane density
+// field and rejection sampling do not apply -- the naked-eye brightest stars are
+// nearby and near-isotropic, and the Milky Way needs mag 4+ to appear at all --
+// so there is no distribution left to sample and a hash would only add a
+// clumping risk with nothing to gain.
+//
+// x is a fraction of width, y a fraction of the sky band (0 top, 1 horizon),
+// then magnitude. Kept clear of the right side where the headland and tower sit.
+// Written as a function rather than a const array: this is GLSL ES 1.00, where
+// array constructors and const arrays are not available.
+//
 void main(){
   vec3 rgb=vc.rgb;
   if(rockTex>0.0){
@@ -1117,7 +1159,12 @@ function buildCliff(){
     const rockAt=(y)=>{
       const u=Math.min(1,Math.max(0,(y-top)/Math.max(1,base-top)));  // 0 top, 1 base
       const h=1+P.rockHaze*u;
-      return [0.020*L*h, 0.031*L*h, 0.051*L*h, 1];
+      // Lifted with the water and sky, but only ~1.5x, not the 2.5x used there:
+      // rockLift (2.8) already multiplies this, so a full 2.5x put the rock at
+      // luminance 59 against a sky of 46 and inverted the silhouette. The rock
+      // has to stay DARKER than the sky band -- that contrast is the only thing
+      // drawing the outline.
+      return [0.022*L*h, 0.034*L*h, 0.056*L*h, 1];
     };
     // Fan the outline against the bottom-right corner. The silhouette is a simple
     // polygon anchored on the base line, so a fan from (W,base) covers it without
@@ -1242,8 +1289,9 @@ function buildCliff(){
   // has the most contrast exactly where its outline is.
   if(P.sky>0){
     const g=P.sky;
-    const hi=[0.031*(1+g*0.45),0.047*(1+g*0.45),0.078*(1+g*0.45),1];
-    const lo=[0.031*(1+g*1.5), 0.055*(1+g*1.5), 0.086*(1+g*1.5), 1];
+    // Bases lifted 2.5x with the water ground, same reason and same hue.
+    const hi=[0.078*(1+g*0.45),0.118*(1+g*0.45),0.195*(1+g*0.45),1];
+    const lo=[0.078*(1+g*1.5), 0.138*(1+g*1.5), 0.215*(1+g*1.5), 1];
     const S=new Float32Array(6*6); let j=0;
     j=push(S,j,0,0,hi[0],hi[1],hi[2],1);
     j=push(S,j,W,0,hi[0],hi[1],hi[2],1);
@@ -1486,7 +1534,12 @@ function frame(now){
 
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);
   gl.viewport(0,0,cv.width,cv.height);
-  gl.clearColor(0.027,0.039,0.063,1);          // flat ground, no sky gradient
+  // Lifted 2.5x off the original 0.027/0.039/0.063 (RGB 7,10,16). That floor was
+  // 3.5% luminance -- fine on a dark screen, gone under any room light. The hue
+  // is unchanged; only the level moved. Raised here rather than via bright
+  // because 0.2% of the water already clips at 255 during a sweep, so scaling the
+  // lines too would only flatten more highlights to white.
+  gl.clearColor(0.067,0.098,0.157,1);          // flat ground, no sky gradient
   gl.clear(gl.COLOR_BUFFER_BIT);
 
   drawSky();
