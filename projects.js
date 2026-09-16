@@ -80,7 +80,7 @@ const PROJECTS = [
     name: "Sundial",
     tagline: "Schedule your monitor's brightness by time of day.",
     blurb:
-      "A macOS menu bar app that holds a set of brightness and contrast presets and applies them on a schedule, so you never reach for the buttons on the monitor itself again. It drives the real backlight over DDC rather than dimming with an overlay, and fades between presets over a few minutes.",
+      "A macOS menu bar app that holds a set of brightness and contrast presets and applies them on a schedule, so you never reach for the buttons on the monitor itself again. It drives the real backlight over DDC rather than dimming with an overlay, eases each change in over a minute, and puts the setting back whenever the display drifts.",
     tags: ["Swift", "macOS"],
     repo: "https://github.com/andres-al-campos/Sundial",
   },
