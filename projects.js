@@ -14,7 +14,7 @@ const PROJECTS = [
     name: "WebTime",
     tagline: "Track and take control of your time.",
     blurb:
-      "A Firefox extension that tracks where your time goes, by session and by day. The limits are strict enough to actually lower usage and loose enough that you keep the extension installed, which most blockers get wrong in one direction or the other. Warnings start well before a limit, with a wind-down in the last minute.",
+      "A browser extension that tracks where your time goes, by session and by day. The limits are strict enough to actually lower usage and loose enough that you keep the extension installed, which most blockers get wrong in one direction or the other. Warnings start well before a limit, with a wind-down in the last minute.",
     tags: ["TypeScript", "browser extension"],
     repo: "https://github.com/andres-al-campos/WebTime",
     image: "img/webtime.png",
@@ -31,7 +31,7 @@ const PROJECTS = [
     name: "Momus",
     tagline: "Read Google Maps reviews with a skeptical eye.",
     blurb:
-      "A Firefox extension that pulls every review for a location and scores it for the marks of a bought one, starting with a bimodal star distribution: a pile of fives and a pile of ones averaging to a respectable 4.2. Built for apartment hunting, and it ranks places side by side once you have gathered a few.",
+      "A browser extension that pulls every review for a location and scores it for the marks of a bought one, starting with a bimodal star distribution: a pile of fives and a pile of ones averaging to a respectable 4.2. Built for apartment hunting, and it ranks places side by side once you have gathered a few.",
     tags: ["JavaScript", "browser extension", "distribution analysis"],
     repo: "https://github.com/andres-al-campos/Momus",
     image: "img/momus.png",
@@ -81,7 +81,7 @@ const PROJECTS = [
     tagline: "Schedule your monitor's brightness by time of day.",
     blurb:
       "A macOS menu bar app that holds a set of brightness and contrast presets and moves between them through the day, easing each change in over a minute. Bright enough to work by at noon, dim enough to sit with at midnight, and you never touch the buttons on the monitor to get there.",
-    tags: ["Swift", "macOS", "DDC"],
+    tags: ["Swift", "macOS", "monitor control"],
     repo: "https://github.com/andres-al-campos/Sundial",
   },
 ];
