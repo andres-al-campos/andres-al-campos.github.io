@@ -14,7 +14,7 @@ const PROJECTS = [
     name: "WebTime",
     tagline: "Track and take control of your time.",
     blurb:
-      "A Firefox extension that tracks where your time goes, by session and by day. The limits are strict enough to actually lower usage and loose enough that you keep the extension installed, which most blockers get wrong in one direction or the other. It warns before a limit rather than at it.",
+      "A Firefox extension that tracks where your time goes, by session and by day. The limits are strict enough to actually lower usage and loose enough that you keep the extension installed, which most blockers get wrong in one direction or the other. Warnings start well before a limit, with a wind-down in the last minute.",
     tags: ["TypeScript", "Firefox extension"],
     repo: "https://github.com/andres-al-campos/WebTime",
     image: "img/webtime.png",
@@ -23,7 +23,7 @@ const PROJECTS = [
     name: "Ansa",
     tagline: "Break tasks down until the leaves are small enough to do.",
     blurb:
-      "A to-do list where a task is a tree and progress rolls up from the leaves, so every branch shows how far along it is. On web, iOS, and desktop, all against the same tree. An agent can hold the other end over MCP and edit alongside you, live.",
+      "A to-do list where a task is a tree and progress rolls up from the leaves, so every branch shows how far along it is. On web, iOS, and desktop, all against the same tree.",
     tags: ["TypeScript", "React", "Swift", "MCP"],
     repo: "https://github.com/andres-al-campos/Ansa",
   },
@@ -80,7 +80,7 @@ const PROJECTS = [
     name: "Sundial",
     tagline: "Schedule your monitor's brightness by time of day.",
     blurb:
-      "A macOS menu bar app that holds a set of brightness and contrast presets and applies them on a schedule, so you never reach for the buttons on the monitor itself again. It drives the real backlight over DDC rather than dimming with an overlay, and fades between presets rather than jumping.",
+      "A macOS menu bar app that holds a set of brightness and contrast presets and applies them on a schedule, so you never reach for the buttons on the monitor itself again. It drives the real backlight over DDC rather than dimming with an overlay, and fades between presets over a few minutes.",
     tags: ["Swift", "macOS"],
     repo: "https://github.com/andres-al-campos/Sundial",
   },
