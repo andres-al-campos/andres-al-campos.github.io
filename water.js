@@ -166,6 +166,19 @@ const P={
   // The structure the light comes from. With the headland on, lampX is ignored:
   // the lamp rides the top of the tower, so the glare path on the water converges
   // on the light the viewer can actually see rather than on a floating point.
+  // 42 stars, a density chosen by eye rather than by a magnitude limit. A
+  // physical count for early twilight would be single digits over a window this
+  // size (~15 stars brighter than mag 1 in the whole sky, ~50 brighter than
+  // mag 2), but at single digits over a band this wide the sky reads as empty
+  // rather than as twilight, and the faint tail does not render at all against
+  // this backdrop. See the magnitude note above the starTab uniform.
+  starN:42,           // how many to place. Capped at 64 by STARMAX in the shader
+  starSeed:7,         // fixed, so the field is the same constellation every load
+  starTextPad:7,      // px of clearance kept around each text line box
+  starMinGap:26,      // px minimum separation, so rejected stars do not pile up
+                      // in the few open gaps between lines
+  stars:3.4,          // master brightness. 0 = none. Positions and magnitudes
+                      // come from buildStars; this only scales them.
   sky:.16,            // lift of the sky band above the flat ground. 0 = no sky.
                       // Floor is about .15: below that the sky falls under the
                       // rock and the headland silhouette inverts (measured at
@@ -693,6 +706,11 @@ uniform float rockBand;    // strata contrast
 uniform float rockGrain;   // broad mottle under the bands
 uniform vec2 rockOrigin;   // cliff top-left, so the pattern is tied to the rock
 uniform float rockSpan;    // waterline minus top, for height-relative banding
+// Stars. Only the sky quad sets this; every other user of pSolid leaves it at 0.
+uniform float starOn;      // 0 = off
+uniform float starHz;      // horizon y in CSS px, so altitude is measurable
+uniform float starGain;    // master brightness
+uniform vec2 starRes;      // canvas size in CSS px; VS_SOLID's res is not in scope here
 
 float h21(vec2 p){ return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453); }
 // Value noise. Smoothstep on the lerp, so the cells do not show as a grid.
@@ -721,6 +739,89 @@ float vnoise(vec2 p){
 // Written as a function rather than a const array: this is GLSL ES 1.00, where
 // array constructors and const arrays are not available.
 //
+// Star table. Generated once in JS at load (see buildStars) and pushed here as
+// a uniform array, rather than hardcoded: the positions have to be rejected
+// against the live text line boxes, which are only knowable from the DOM.
+//
+// Computed once and then frozen. A resize does NOT re-roll them -- stars staying
+// put through a window drag matters more than staying perfectly clear of
+// reflowed text, and re-rolling on resize made the whole field jump.
+//
+// Each entry is (x fraction of width, y fraction of the sky band, magnitude).
+// Magnitudes run 1.2 to 2.4, about a 3x flux spread. Intentionally narrow: the
+// height ramp below is meant to be the dominant term (~8x), so magnitude is
+// variation on top of a gradient rather than the thing setting brightness.
+// A wider spread was tried at 0.4-3.0 and inverted that -- magnitude beat height
+// roughly 5:1, so brightness looked scattered instead of graded by altitude.
+//
+// Density thins gradually toward the waterline rather than stopping. An earlier
+// pass put only 6 of 42 below y=0.5 and let extinction take most of what was
+// left, which produced a hard empty band across the lower sky -- a real twilight
+// sky thins toward the horizon, it does not have an edge.
+#define STARMAX 64
+uniform vec3 starTab[STARMAX];
+uniform int starCount;
+
+vec3 starLayer(vec2 pxy, float hz){
+  vec3 acc=vec3(0.0);
+  // STARMAX bound with a runtime break: GLSL ES 1.00 requires a constant loop
+  // bound, so the real count comes from the break.
+  for(int i=0;i<STARMAX;i++){
+    if(i>=starCount) break;
+    vec3 s=starTab[i];
+    vec2 c=vec2(s.x*starRes.x, s.y*hz);
+    // Flux from magnitude: each step is 2.512x, normalised so mag 1 is 1.0.
+    float flux=pow(2.512, 1.0-s.z);
+    // Headroom, not extinction. The sky quad is a gradient: darkest at the top,
+    // lightest at the horizon. So what a star can spend is set by how much room
+    // it has above the backdrop behind it -- bright is available at the top and
+    // the low sky can only carry a dim one before it stops reading as a point
+    // and starts looking pasted on.
+    //
+    // This is deliberately not the physical model. Airmass extinction would give
+    // a similar downward gradient, but it dims by altitude regardless of the
+    // backdrop, and on a band this shallow it drove the faint end below the sky
+    // value entirely -- stars that rendered as nothing. Scaling to the available
+    // contrast instead means every star clears its own local background.
+    //
+    // alt is 1 at the top of the band, 0 at the horizon line.
+    float alt=clamp(1.0-s.y, 0.0, 1.0);
+    flux*=mix(0.12, 1.0, pow(alt, 0.80));
+    // A point source, not a sphere. A single wide Gaussian has no sharp centre --
+    // it is all falloff, which renders as a little lit ball. A real star is a
+    // hard pinprick with a weak diffraction halo around it, so the profile is a
+    // tight core carrying almost all the light plus a wide halo at a few
+    // percent. The ratio between them is what reads as "puncture" rather than
+    // "orb".
+    //
+    // The core stays a Gaussian rather than a hard disc because a sub-pixel hard
+    // edge crawls and flickers when the canvas resizes, which is the aliasing
+    // this whole scene is built to avoid.
+    //
+    // 0.85 rather than the 0.62 tried first: at 0.62 the core fell entirely
+    // inside one pixel, so a star landing between sample points contributed
+    // almost nothing and the faint ones measured at the backdrop value. 0.85
+    // spreads it across ~2px, which still has a clear centre spike.
+    //
+    // The wide third term is gone. It was a 6px Gaussian at 3%, which is a low
+    // flat plateau about twelve pixels across -- at these levels that quantizes
+    // to one or two 8-bit steps and reads as a dim disc with a hot middle,
+    // exactly the "tiny sphere" it was supposed to avoid. It also flattened the
+    // brightness spread: the skirt contributed nearly the same amount for every
+    // star whatever its magnitude, so bright and faint differed only in a peak a
+    // couple of levels apart. Two terms, and the halo pulled in and down.
+    float d=length(pxy-c);
+    float core=exp(-(d*d)/(2.0*0.72*0.72));
+    float halo=exp(-(d*d)/(2.0*1.55*1.55))*0.055;
+    // Near-white, with only a trace of warmth left at the horizon. A fuller
+    // reddening is what real airmass does, but at a 2px dot it does not read as
+    // atmosphere -- it just makes the low stars look dirty rather than distant.
+    vec3 tint=mix(vec3(1.0,0.97,0.93), vec3(0.99,0.99,1.0), alt);
+    acc+=tint*flux*(core+halo);
+  }
+  return acc;
+}
+
 void main(){
   vec3 rgb=vc.rgb;
   if(rockTex>0.0){
@@ -745,6 +846,10 @@ void main(){
     float t=1.0+((bands-0.5)*rockBand + grain*rockGrain)*fade;
     rgb*=max(0.25, t);
   }
+  // Added, not mixed: a star is light arriving on top of the sky, and the sky
+  // quad is opaque so there is no blend to ride. Sits above the rock branch
+  // because the sky draws first and the headland then covers it.
+  if(starOn>0.0) rgb+=starLayer(vp, starHz)*starGain;
   gl_FragColor=vec4(rgb*vc.a*mul, vc.a*mul);
 }`;
 
@@ -1305,6 +1410,77 @@ function buildCliff(){
   } else SKYCOUNT=0;
 }
 
+// Star positions, generated once at load and then frozen.
+//
+// Rejection sampling: draw a candidate, discard it if it lands on a text line
+// box, retry. That is what keeps the density even -- a rejected star gets a new
+// home instead of vanishing, so masking the copy does not thin the field. An
+// earlier attempt dimmed stars inside one big masthead rectangle, which blanked
+// the interline gaps and the short last line along with the glyphs.
+//
+// Line boxes, not paragraph boxes. A paragraph block is mostly empty space
+// between baselines, and rejecting all of it throws away sky that reads as open.
+const STARS={tab:new Float32Array(64*3), n:0};
+
+// Per-line rectangles for every text run over the sky, padded. Range objects
+// give one rect per rendered line, which is what the eye actually sees as
+// occupied -- unlike the element box, which spans the ragged right edge too.
+function textLineRects(pad){
+  const c=cv.getBoundingClientRect(), out=[];
+  const host=document.querySelector('.copy, .masthead');
+  if(!host) return out;
+  const walk=document.createTreeWalker(host,NodeFilter.SHOW_TEXT);
+  for(let t=walk.nextNode(); t; t=walk.nextNode()){
+    if(!t.nodeValue.trim()) continue;
+    const rg=document.createRange(); rg.selectNodeContents(t);
+    const rects=rg.getClientRects();
+    for(let i=0;i<rects.length;i++){
+      const r=rects[i];
+      if(r.width<2||r.height<2) continue;
+      out.push([r.left-c.left-pad, r.top-c.top-pad,
+                r.right-c.left+pad, r.bottom-c.top+pad]);
+    }
+  }
+  return out;
+}
+
+function buildStars(){
+  const hz=horizonY(), boxes=textLineRects(P.starTextPad);
+  // Fixed seed: the field is a designed constellation, not noise that should
+  // differ per load.
+  let sd=P.starSeed>>>0;
+  const rnd=()=>{ sd=(sd*1664525+1013904223)>>>0; return sd/4294967296; };
+  const hit=(px,py)=>{
+    for(let i=0;i<boxes.length;i++){
+      const b=boxes[i];
+      if(px>=b[0]&&px<=b[2]&&py>=b[1]&&py<=b[3]) return true;
+    }
+    return false;
+  };
+  let n=0, guard=0;
+  const want=Math.min(P.starN,64);
+  while(n<want && guard<20000){
+    guard++;
+    const x=rnd();
+    // Biased upward so density falls off toward the waterline. pow>1 on a
+    // uniform draw concentrates toward 0, which is the top of the band.
+    const y=Math.pow(rnd(), 1.6);
+    if(hit(x*W, y*hz)) continue;
+    // Keep a minimum separation so retries do not pile candidates into the few
+    // open gaps between lines.
+    let tooClose=false;
+    for(let k=0;k<n;k++){
+      const dx=(STARS.tab[k*3]-x)*W, dy=(STARS.tab[k*3+1]-y)*hz;
+      if(dx*dx+dy*dy < P.starMinGap*P.starMinGap){ tooClose=true; break; }
+    }
+    if(tooClose) continue;
+    STARS.tab[n*3]=x; STARS.tab[n*3+1]=y;
+    STARS.tab[n*3+2]=1.2+rnd()*1.2;   // magnitude 1.2 - 2.4
+    n++;
+  }
+  STARS.n=n;
+}
+
 function drawSky(){
   if(!SKYCOUNT) return;
   gl.useProgram(pSolid);
@@ -1313,6 +1489,13 @@ function drawSky(){
   // Shares pSolid with the rock, and uniforms persist per program: without this
   // the sky would pick up the rock's strata whenever it drew after the cliff.
   gl.uniform1f(gl.getUniformLocation(pSolid,'rockTex'),0);
+  gl.uniform1f(gl.getUniformLocation(pSolid,'starOn'),P.stars>0?1:0);
+  gl.uniform1f(gl.getUniformLocation(pSolid,'starHz'),horizonY());
+  gl.uniform1f(gl.getUniformLocation(pSolid,'starGain'),P.stars);
+  gl.uniform2f(gl.getUniformLocation(pSolid,'starRes'),W,H);
+  if(!STARS.n) buildStars();
+  gl.uniform3fv(gl.getUniformLocation(pSolid,'starTab'),STARS.tab);
+  gl.uniform1i(gl.getUniformLocation(pSolid,'starCount'),STARS.n);
   gl.bindBuffer(gl.ARRAY_BUFFER,SKYBUF);
   const pa=gl.getAttribLocation(pSolid,'p'), ca=gl.getAttribLocation(pSolid,'c');
   gl.enableVertexAttribArray(pa); gl.enableVertexAttribArray(ca);
@@ -1383,6 +1566,9 @@ function drawCliff(){
   const U=n=>gl.getUniformLocation(pSolid,n);
   gl.uniform2f(U('res'),W,H);
   gl.uniform1f(U('mul'),1);
+  // drawSky turns this on and uniforms persist per program, so without the reset
+  // the headland and the halo get a starfield painted through them.
+  gl.uniform1f(U('starOn'),0);
   gl.bindBuffer(gl.ARRAY_BUFFER,SBUF);
   const pa=gl.getAttribLocation(pSolid,'p'), ca=gl.getAttribLocation(pSolid,'c');
   gl.enableVertexAttribArray(pa); gl.enableVertexAttribArray(ca);
