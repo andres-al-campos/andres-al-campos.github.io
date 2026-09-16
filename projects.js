@@ -1,7 +1,6 @@
 // The whole site's content. Add a project by appending an object here.
 //
-// Six, deliberately. The full list of what I've built lives on GitHub; this page
-// is a selection, and a visitor who skims ten cards remembers none of them.
+// A selection, not the full list -- the rest is on GitHub, linked below the grid.
 //
 //   name      required
 //   tagline   required — one line, the pitch
@@ -60,5 +59,29 @@ const PROJECTS = [
       "An on-device iPhone sleep tracker that senses movement, breathing, and heartbeat overnight and reports what it actually measured. Lying awake still looks identical to deep sleep on an accelerometer, so every stat carries a tier: sensor fact, honest estimate, or not enough data.",
     tags: ["Swift", "SwiftData", "signal processing"],
     repo: "https://github.com/andres-al-campos/Somnya",
+  },
+  {
+    name: "Etymon",
+    tagline: "Find the word that connects a set of words.",
+    blurb:
+      "Give it cat and lion and it walks a graph of GloVe embeddings to find the words sitting close to both. Two searches run in parallel, a fast set intersection and a best-first traversal, and every result shows the path it walked to get there.",
+    tags: ["Python", "embeddings", "graph search"],
+    repo: "https://github.com/andres-al-campos/Etymon",
+  },
+  {
+    name: "ReSign",
+    tagline: "Keep sideloaded iOS apps from expiring.",
+    blurb:
+      "A free Apple developer account signs an app for seven days. ReSign sits in the menu bar, tracks when each profile runs out, and rebuilds and reinstalls two hours before it does. It checks again whenever the Mac wakes.",
+    tags: ["Swift", "macOS", "menu bar"],
+    repo: "https://github.com/andres-al-campos/ReSign",
+  },
+  {
+    name: "Sundial",
+    tagline: "Schedule your monitor's brightness by time of day.",
+    blurb:
+      "Drives the monitor's real backlight over DDC rather than dimming with an overlay, and interpolates between presets so the change is gradual. It won't let you build a schedule until it has confirmed it can actually read your display.",
+    tags: ["Swift", "macOS", "DDC"],
+    repo: "https://github.com/andres-al-campos/Sundial",
   },
 ];
