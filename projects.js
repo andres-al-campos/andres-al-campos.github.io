@@ -14,7 +14,7 @@ const PROJECTS = [
     name: "WebTime",
     tagline: "Track and take control of your time.",
     blurb:
-      "A Firefox extension that tracks how long you spend on each site and puts a small timer in the corner of the screen. It uses session-based browsing — focused sessions, gentle nudges, and a cooldown when a limit is reached.",
+      "A Firefox extension that breaks browsing into sessions instead of daily totals. It warns before a limit rather than at it: a visual pulse early, a popup as you approach your usual amount, a 60-second wind-down near the end. The blocks are loose enough that I still have it installed.",
     tags: ["Firefox extension", "TypeScript"],
     repo: "https://github.com/andres-al-campos/WebTime",
     image: "img/webtime.png",
@@ -23,15 +23,15 @@ const PROJECTS = [
     name: "Ansa",
     tagline: "Break tasks down until the leaves are small enough to do.",
     blurb:
-      "A Workflowy-style outliner backed by a single SQLite source of truth. The React app and an MCP server are peer clients of the same REST API, so a Claude and a person can edit the same tree at once, over SSE, without diverging.",
-    tags: ["React", "TypeScript", "Fastify", "MCP"],
+      "An outliner where a task is a tree and progress rolls up from the leaves, so a branch shows how far along it is. The React app and an MCP server are peer clients of the same API, which means a Claude and a person can edit the same tree at once and both see it change.",
+    tags: ["React", "TypeScript", "Cloudflare Workers", "MCP"],
     repo: "https://github.com/andres-al-campos/Ansa",
   },
   {
     name: "Winnow",
     tagline: "Find the company whose Glassdoor reviews are real.",
     blurb:
-      "A high average rating is cheap — most things north of 4.0 are propped up by review pushes. Winnow scores each company on whether its review distribution looks organically produced, then lets the genuine outlier fall out: high average and a trustworthy statistical signature.",
+      "Almost anything above 4.0 has had a review push behind it, so the average alone proves nothing. Winnow scores the shape of the distribution instead, adding signals Glassdoor exposes and Google Maps does not: ex-employee against current-employee sentiment, sub-rating coherence, and how the rating moved over time.",
     tags: ["Python", "statistics", "scraping"],
     repo: "https://github.com/andres-al-campos/Winnow",
   },
@@ -39,7 +39,7 @@ const PROJECTS = [
     name: "Momus",
     tagline: "Read Google Maps reviews with a skeptical eye.",
     blurb:
-      "A Firefox extension that scrapes every review from a Google Maps location and scores it for fake-review patterns — bimodal star distributions, date clustering, spelling anomalies. Built for apartment hunting; it ranks locations side by side once you've gathered a few.",
+      "A Firefox extension that pulls every review for a location and scores it for the marks of a bought one, starting with a bimodal star distribution: a pile of fives and a pile of ones averaging to a respectable 4.2. Built for apartment hunting, and it ranks places side by side once you have gathered a few.",
     tags: ["Firefox extension", "JavaScript", "statistics"],
     repo: "https://github.com/andres-al-campos/Momus",
     image: "img/momus.png",
@@ -48,7 +48,7 @@ const PROJECTS = [
     name: "Chronicle",
     tagline: "A personal encyclopedia of your Claude conversations.",
     blurb:
-      "Captures your Claude.ai history and turns it into a durable, searchable record: every conversation gets a markdown summary, and those roll up into half-month, quarter, and year entries. An MCP server lets Claude read back through it. Everything runs locally.",
+      "Every conversation gets a markdown summary, and those roll up into half-month, quarter, and year entries, so a question about what you decided six months ago has somewhere to land. An MCP server hands the archive back to Claude. The summarizing passes are the only time anything leaves the machine.",
     tags: ["Python", "MCP", "Firefox extension"],
     repo: "https://github.com/andres-al-campos/Chronicle",
   },
@@ -56,7 +56,7 @@ const PROJECTS = [
     name: "Somnya",
     tagline: "Sleep measured, not scored.",
     blurb:
-      "An on-device iPhone sleep tracker that senses movement, breathing, and heartbeat overnight and reports what it actually measured. Lying awake still looks identical to deep sleep on an accelerometer, so every stat carries a tier: sensor fact, honest estimate, or not enough data.",
+      "Lying awake looks identical to deep sleep on an accelerometer, so most sleep scores are confident about something they cannot know. Somnya senses movement, breathing, and heartbeat overnight, then labels every stat with how much it can stand behind it: sensor fact, honest estimate, or not enough data.",
     tags: ["Swift", "SwiftData", "signal processing"],
     repo: "https://github.com/andres-al-campos/Somnya",
   },
