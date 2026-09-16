@@ -15,7 +15,7 @@ const PROJECTS = [
     tagline: "Track and take control of your time.",
     blurb:
       "A Firefox extension that tracks where your time goes, by session and by day. The limits are strict enough to actually lower usage and loose enough that you keep the extension installed, which most blockers get wrong in one direction or the other. Warnings start well before a limit, with a wind-down in the last minute.",
-    tags: ["TypeScript", "Firefox extension"],
+    tags: ["TypeScript", "browser extension"],
     repo: "https://github.com/andres-al-campos/WebTime",
     image: "img/webtime.png",
   },
@@ -28,28 +28,28 @@ const PROJECTS = [
     repo: "https://github.com/andres-al-campos/Ansa",
   },
   {
-    name: "Winnow",
-    tagline: "Find the company whose Glassdoor reviews are real.",
-    blurb:
-      "Almost anything above 4.0 has had a review push behind it, so the average alone proves nothing. Winnow scores the shape of the distribution instead, adding signals Glassdoor exposes and Google Maps does not: ex-employee against current-employee sentiment, sub-rating coherence, and how the rating moved over time.",
-    tags: ["Python", "CLI", "statistics"],
-    repo: "https://github.com/andres-al-campos/Winnow",
-  },
-  {
     name: "Momus",
     tagline: "Read Google Maps reviews with a skeptical eye.",
     blurb:
       "A Firefox extension that pulls every review for a location and scores it for the marks of a bought one, starting with a bimodal star distribution: a pile of fives and a pile of ones averaging to a respectable 4.2. Built for apartment hunting, and it ranks places side by side once you have gathered a few.",
-    tags: ["JavaScript", "Firefox extension", "statistics"],
+    tags: ["JavaScript", "browser extension", "distribution analysis"],
     repo: "https://github.com/andres-al-campos/Momus",
     image: "img/momus.png",
+  },
+  {
+    name: "Winnow",
+    tagline: "Find the company whose Glassdoor reviews are real.",
+    blurb:
+      "Almost anything above 4.0 has had a review push behind it, so the average alone proves nothing. Winnow scores the shape of the distribution instead, adding signals Glassdoor exposes and Google Maps does not: ex-employee against current-employee sentiment, sub-rating coherence, and how the rating moved over time.",
+    tags: ["Python", "CLI", "sentiment analysis", "scraping"],
+    repo: "https://github.com/andres-al-campos/Winnow",
   },
   {
     name: "Chronicle",
     tagline: "A personal encyclopedia of your Claude conversations.",
     blurb:
       "A searchable archive of everything you have said to Claude, built on your own machine from an export of your history. Every conversation gets a markdown summary, and those roll up into half-month, quarter, and year entries, so a question about what you decided six months ago has somewhere to land. An MCP server hands the whole thing back to Claude to read.",
-    tags: ["Python", "MCP", "Firefox extension"],
+    tags: ["Python", "MCP", "browser extension"],
     repo: "https://github.com/andres-al-campos/Chronicle",
   },
   {
