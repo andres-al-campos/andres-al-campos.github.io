@@ -162,7 +162,7 @@ const P={
   beamSoft:.55,       // fraction of the cone that is soft edge
   beamLift:1.6,       // specular gain on crests facing the lamp
   beamWarm:1.0,       // how far lit water shifts toward amber
-  beamSat:.72,        // amber saturation. 1 = full amber, 0 = neutral warm-white
+  beamSat:.6,         // amber saturation. 1 = full amber, 0 = neutral warm-white
   beamGain:.7,     // extra alpha under the beam. Reads as THICKNESS, not just
                       // brightness: the halo is a Gaussian, so a brighter one
                       // stays above the visible threshold further from the
@@ -717,7 +717,7 @@ void main(){
   vec3 cool=vec3(0.56,0.71,0.85);
   // Amber, desaturated toward warm-white by beamSat. Full-saturation amber on
   // water reads as a sunset; the lamp wants to look like a light, not a colour.
-  vec3 amber=mix(vec3(1.0,0.96,0.90), vec3(0.93,0.77,0.59), beamSat);
+  vec3 amber=mix(vec3(1.0,0.96,0.90), vec3(0.92,0.71,0.31), beamSat);  // #EBB450, the page's amber
   float w=clamp(vWarm*beamWarm,0.0,1.0);
   vec3 col=mix(cool, amber, w);
 
