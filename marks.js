@@ -21,9 +21,9 @@ var MARKS = {
       out+='<path class="s dim" style="stroke-width:1.4" d="M17.4 18.6 L16.2 16.4"/>';
       out+='<path class="s dim" style="stroke-width:1.4" d="M22.4 18.4 L23.8 16.4"/>';
       out+='<path class="s dim" style="stroke-width:1.4" d="M26.8 23 L28.8 22.2"/>';
-      // the fake: same size, hollow, lit, turned so one leg points straight down
-      out+='<path class="s lit" style="stroke-width:.85" d="'+star+'" transform="translate(22.6,0.4) scale(1.25) rotate(36 4.75 4.9)"/>';
-      return out;
+      // the fake: looks just like the real one, turned so one leg points straight down
+      out+='<path class="f" d="'+star+'" transform="translate(22.6,0.4) scale(1.25) rotate(36 4.75 4.9)"/>';
+      return '<g transform="translate(0,4)">'+out+'</g>';
     })()
   },
   Chronicle: {
