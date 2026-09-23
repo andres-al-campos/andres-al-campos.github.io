@@ -9,18 +9,23 @@ var MARKS = {
        + '<circle class="f" cx="16" cy="16" r="1.6"/>'
   },
   Momus: {
-    d: 'A magnifier held over a three-star rating',
+    d: 'A rating with one star knocked out of line',
     svg: (function(){
       // one star, 9.5 wide, around (4.75,4.54). Deep inner radius = sharp points.
       var star='M4.75 0 L6.15 3.29 L9.5 3.66 L6.99 6.14 L7.68 9.71 L4.75 7.84 L1.82 9.71 L2.51 6.14 L0 3.66 L3.35 3.29 Z';
       var out='';
-      // all three stars in the faint tone: the rating is what is being questioned
-      for(var i=0;i<3;i++)
-        out+='<path class="f dim" style="opacity:.5" d="'+star+'" transform="translate('+(0.9+i*10.1)+',6.3)"/>';
-      // the lens is the lit element. It sits off the lower-left of the middle
-      // star rather than centred on one, so it reads as mid-scan across the row.
-      out+='<circle class="s lit" cx="13" cy="15.8" r="4.8"/>';
-      out+='<path class="s lit" d="M16.4 19.2 L20.1 22.9"/>';
+      // two full stars bright; the third slot is the faint tone — the empty socket
+      for(var i=0;i<3;i++){
+        var cls = i===2 ? 'f dim' : 'f';
+        out+='<path class="'+cls+'" d="'+star+'" transform="translate('+(0.9+i*10.1)+',3.2)"/>';
+      }
+      // three equal-length vertical trails (5.4 each), each stopping ~0.9 above the
+      // star's upper edge at that x: arms sit at y≈24.8, the apex at 21.2.
+      out+='<path class="s dim" d="M22.0 18.5 L22.0 23.9"/>';
+      out+='<path class="s dim" d="M25.85 14.8 L25.85 20.2"/>';
+      out+='<path class="s dim" d="M29.6 18.5 L29.6 23.9"/>';
+      // fallen straight down out of that third slot, upright, same center x (25.85)
+      out+='<path class="f lit" d="'+star+'" transform="translate(21.1,21.2)"/>';
       return out;
     })()
   },
