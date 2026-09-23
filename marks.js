@@ -17,11 +17,10 @@ var MARKS = {
       // all three stars in the faint tone: the rating is what is being questioned
       for(var i=0;i<3;i++)
         out+='<path class="f dim" style="opacity:.5" d="'+star+'" transform="translate('+(0.9+i*10.1)+',6.3)"/>';
-      // the lens is the lit element. It sits between the first and second stars
-      // rather than on one, so it reads as mid-sweep along the row, and low enough
-      // that it covers only their lower points.
-      out+='<circle class="s lit" cx="10.7" cy="17.6" r="6"/>';
-      out+='<path class="s lit" d="M14.95 21.85 L19.6 26.5"/>';
+      // the lens is the lit element. It sits off the lower-left of the middle
+      // star rather than centred on one, so it reads as mid-scan across the row.
+      out+='<circle class="s lit" cx="13" cy="15.8" r="4.8"/>';
+      out+='<path class="s lit" d="M16.4 19.2 L20.1 22.9"/>';
       return out;
     })()
   },
