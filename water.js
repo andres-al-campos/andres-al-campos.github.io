@@ -111,7 +111,7 @@ const P={
   // the far rows without touching the near ones. .20 read as too faint at the
   // skyline; .26 restores most of it and still sits under the .285 that was
   // aliasing.
-  width:1.1, widthNear:0, dimFar:.26, bright:.82,
+  width:.75, widthNear:0, dimFar:.26, bright:.82,
 
   // --- stage 3: shading -----------------------------------------------------
   // Height-based lighting glows AT the crest, which reads as a glowing ridge.
@@ -123,7 +123,7 @@ const P={
   litGamma:.75,       // <1 lifts the mid-tones, where nearly all the surface sits
   floor:.14,          // darkest a segment gets, as a fraction of full
   crest:1.4,          // extra gain on the sharpest crests
-  glow:3.0,           // halo radius in CSS px. Exponential falloff, not coverage
+  glow:2.0,           // halo radius in CSS px. Exponential falloff, not coverage
   glowAmt:.55,        // its alpha. High: the halo carries the line, not the core
   // The framebuffer is gamma-encoded, so a linear coverage ramp lands darker
   // than the fraction it stands for: half coverage shows as about a fifth of
