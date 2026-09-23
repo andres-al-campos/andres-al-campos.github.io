@@ -15,14 +15,14 @@ var MARKS = {
       var star='M4.75 0 L6.15 3.29 L9.5 3.66 L6.99 6.14 L7.68 9.71 L4.75 7.84 L1.82 9.71 L2.51 6.14 L0 3.66 L3.35 3.29 Z';
       var out='';
       // the real star, and beside it the faint empty socket
-      out+='<path class="f" d="'+star+'" transform="translate(1,14) scale(1.35)"/>';
-      out+='<path class="f dim" d="'+star+'" transform="translate(15.5,14) scale(1.35)"/>';
+      out+='<path class="f" d="'+star+'" transform="translate(0,19.5) scale(1.25)"/>';
+      out+='<path class="f dim" d="'+star+'" transform="translate(13.5,19.5) scale(1.25)"/>';
       // short burst lines around the socket: popped, not fallen
-      out+='<path class="s dim" style="stroke-width:1.4" d="M19 13.2 L17.8 11"/>';
-      out+='<path class="s dim" style="stroke-width:1.4" d="M23.8 13 L25.4 11"/>';
-      out+='<path class="s dim" style="stroke-width:1.4" d="M28.3 17.6 L30.2 16.8"/>';
-      // the fake: hollow, lit, tilted, up and to the right clear of the burst
-      out+='<path class="s lit" style="stroke-width:1" d="'+star+'" transform="translate(23.2,-2) scale(1.1) rotate(22 4.75 4.9)"/>';
+      out+='<path class="s dim" style="stroke-width:1.4" d="M17.4 18.6 L16.2 16.4"/>';
+      out+='<path class="s dim" style="stroke-width:1.4" d="M22.4 18.4 L23.8 16.4"/>';
+      out+='<path class="s dim" style="stroke-width:1.4" d="M26.8 23 L28.8 22.2"/>';
+      // the fake: same size, hollow, lit, turned so one leg points straight down
+      out+='<path class="s lit" style="stroke-width:.85" d="'+star+'" transform="translate(22.6,0.4) scale(1.25) rotate(36 4.75 4.9)"/>';
       return out;
     })()
   },
