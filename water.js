@@ -210,6 +210,7 @@ const P={
   // and hung off the face. The unit is the screen height, capped by width so a
   // portrait screen does not give the headland most of the frame.
   cliffSpan:.384,     // headland width from the face to the right edge, in units
+  towerTextPad:14,    // px of clear space kept between the tower and the copy
   cliffMaxW:.38,      // most of the screen width the headland may take
   cliffH:.085,        // mesa top above the horizon, in units.
                       // Floor is about .06: below that the mesa is thinner than
@@ -1275,13 +1276,28 @@ function buildCliff(){
     CLIFF.lampX=W*P.lampX; CLIFF.lampY=hz-2;
   }
   if(CLIFF.on){
-    const S=Math.min(H, W*P.cliffMaxW/P.cliffSpan);
-    CLIFF.x=W-S*P.cliffSpan;
-    CLIFF.base=hz+S*0.012;
-    CLIFF.top=hz-S*P.cliffH;
-    CLIFF.lampX=CLIFF.x+(W-CLIFF.x)*P.lampPos;
-    CLIFF.lampY=CLIFF.top-S*P.towerH;
-    CLIFF.tw=Math.max(3,S*P.towerW);
+    // Shrink until the tower and its glow clear every line of copy. A width
+    // cap alone only guesses where the text wraps; measuring the lines means
+    // the tower gives way exactly as the text reaches it, at any window size.
+    const lines=textLineRects(P.towerTextPad);
+    const place=(S)=>{
+      CLIFF.x=W-S*P.cliffSpan;
+      CLIFF.base=hz+S*0.012;
+      CLIFF.top=hz-S*P.cliffH;
+      CLIFF.lampX=CLIFF.x+(W-CLIFF.x)*P.lampPos;
+      CLIFF.lampY=CLIFF.top-S*P.towerH;
+      CLIFF.tw=Math.max(3,S*P.towerW);
+    };
+    const hits=()=>{
+      const full=(CLIFF.top-CLIFF.lampY)/(1-LAMP_V), hw=full/TOWER_ASPECT/2;
+      const glow=CLIFF.tw*2;
+      const x0=CLIFF.lampX-hw-glow, x1=CLIFF.lampX+hw+glow;
+      const y0=CLIFF.lampY-full*LAMP_V-glow, y1=CLIFF.top;
+      return lines.some(r=>r[0]<x1&&r[2]>x0&&r[1]<y1&&r[3]>y0);
+    };
+    let S=Math.min(H, W*P.cliffMaxW/P.cliffSpan);
+    place(S);
+    for(let n=0;n<40&&hits();n++){ S*=0.95; place(S); }
   }
 
   const HN=22;                       // halo fan segments
