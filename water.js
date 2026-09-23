@@ -64,6 +64,7 @@ const P={
   // --- the simulation (values carried over from water.js, already tuned) ---
   simW:340, simH:210,
   simGain:5,
+  bottomSoft:14,      // px over which the bottom row's troughs ease to a stop
   stiff:1.85,         // hard CFL ceiling at 2.0; see water.js
   breakAt:.0008,      // squared-slope threshold where a crest starts to break
   breakRate:6,        // how hard excess steepness is bled off
@@ -419,6 +420,7 @@ attribute vec3 a;                 // x = line index, y = column, z = corner (-1/
 uniform sampler2D sim;
 uniform vec2 res;
 uniform float N, M, step, hz, persp, amp, ampNear, ampFar;
+uniform float bottomSoft;
 uniform float simGain, simW, simH, fetch, skirt, lineW, widthNear;
 uniform float slopeLit, litRange, litGamma, floorLit, crestGain;
 uniform float dpr;
@@ -504,7 +506,14 @@ vec2 pointAt(float i, float j){
   float x=-40.0 + j*step;
   float hgt=heightAt(gridAt(i,j))*simGain;
   float a2=(res.y-hz)*amp*(ampFar+near*ampNear);
-  return vec2(x, y0 - hgt*a2);
+  // The last row sits on the canvas edge, so a trough there dipped out of view
+  // and the bottom line came and went. Past a knee, downward travel is squeezed
+  // exponentially toward a floor one line-width inside the edge: smooth, so it
+  // reads as the wave flattening rather than a clip, and never below the floor.
+  float y=y0 - hgt*a2;
+  float floorY=res.y-lineW*widthNear-2.0, knee=floorY-bottomSoft;
+  if(y>knee) y=knee+bottomSoft*(1.0-exp(-(y-knee)/bottomSoft));
+  return vec2(x, y);
 }
 
 void main(){
@@ -1809,7 +1818,7 @@ function frame(now){
   gl.uniform1f(U('N'),Math.max(1,Math.round(P.lines))); gl.uniform1f(U('M'),M);
   gl.uniform1f(U('step'),P.ptStep);
   gl.uniform1f(U('hz'),horizonY());
-  gl.uniform1f(U('persp'),P.persp);
+  gl.uniform1f(U('persp'),P.persp); gl.uniform1f(U('bottomSoft'),P.bottomSoft);
   gl.uniform1f(U('amp'),P.amp);   gl.uniform1f(U('ampNear'),P.ampNear);
   gl.uniform1f(U('ampFar'),P.ampFar);
   gl.uniform1f(U('simGain'),P.simGain);
