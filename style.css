@@ -37,7 +37,7 @@
    with classic (space-taking) scrollbars, and the whole page jumps sideways the
    moment content grows past one screen. Ignored where scrollbars are overlays,
    which is the macOS default. */
-html { scroll-behavior: smooth; scrollbar-gutter: stable both-edges; }
+html { scroll-behavior: smooth; scrollbar-gutter: stable; }
 
 body {
   margin: 0;
