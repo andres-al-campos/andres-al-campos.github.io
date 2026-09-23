@@ -346,6 +346,9 @@ main {
   min-height: clamp(560px, 88vh, 900px);
   overflow: hidden;
   background: #0B0D12;
+  /* Redefining --ink below is not enough on its own: body already resolved
+     color to the light-mode ink, and the h1 inherits that computed value. */
+  color: var(--ink);
   --ink: #E8E6E1;
   --soft: #8A8894;
   --faint: #7E7C88;
