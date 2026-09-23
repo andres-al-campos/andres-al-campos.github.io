@@ -31,7 +31,7 @@ const PROJECTS = [
     name: "Momus",
     tagline: "Read Google Maps reviews with a skeptical eye.",
     blurb:
-      "A browser extension that pulls every review for a location and asks two questions: are these reviews real, and what are people complaining about? Real ratings spread across the scale, while bought ones pile up at five stars with a few angry ones, so the shape of the ratings says a lot. Then it scans the text for pests, mold, noise, crime, and bad management. Built for apartment hunting, and it ranks places side by side once you have gathered a few.",
+      "A browser extension that pulls every review for a place and asks whether they are real. Genuine ratings spread across the scale while bought ones pile up at five stars, so the shape of the ratings says a lot. It also reads what people praise and what they complain about, and checks whether the topics Google highlights are hiding trouble, like \"maintenance\" turning up mostly in the low-star reviews.",
     tags: ["JavaScript", "browser extension", "distribution analysis"],
     repo: "https://github.com/andres-al-campos/Momus",
     image: "img/momus.png",
@@ -40,7 +40,7 @@ const PROJECTS = [
     name: "Winnow",
     tagline: "Find the company whose Glassdoor reviews are real.",
     blurb:
-      "Almost anything above 4.0 has had a review push behind it, so the average alone proves nothing. Winnow scores the shape of the distribution instead, adding signals Glassdoor exposes and Google Maps does not: ex-employee against current-employee sentiment, sub-rating coherence, and how the rating moved over time.",
+      "Almost every company above 4.0 has had a review push behind it, so the average alone proves nothing. Winnow scores many companies on whether their reviews look organic: the shape of the ratings, how former employees compare to current ones, whether the sub-ratings agree, and how the score has moved over time.",
     tags: ["Python", "CLI", "SQLite", "sentiment analysis", "scraping"],
     repo: "https://github.com/andres-al-campos/Winnow",
   },
