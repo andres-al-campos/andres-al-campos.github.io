@@ -31,7 +31,7 @@ const PROJECTS = [
     name: "Momus",
     tagline: "Read Google Maps reviews with a skeptical eye.",
     blurb:
-      "A browser extension that pulls every review for a location and scores it for the marks of a bought one, starting with a bimodal star distribution: a pile of fives and a pile of ones averaging to a respectable 4.2. Built for apartment hunting, and it ranks places side by side once you have gathered a few.",
+      "A browser extension that pulls every review for a location and asks two questions: are these reviews real, and what are people complaining about? Real ratings spread across the scale, while bought ones pile up at five stars with a few angry ones, so the shape of the ratings says a lot. Then it scans the text for pests, mold, noise, crime, and bad management. Built for apartment hunting, and it ranks places side by side once you have gathered a few.",
     tags: ["JavaScript", "browser extension", "distribution analysis"],
     repo: "https://github.com/andres-al-campos/Momus",
     image: "img/momus.png",
