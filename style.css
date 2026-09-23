@@ -49,13 +49,6 @@ body {
   overflow-x: hidden;
 }
 
-/* Ambient bloom — the light the marks sit in. Fixed, behind everything. */
-.bloom { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
-.bloom i { position: absolute; display: block; border-radius: 50%; filter: blur(90px); opacity: .9; }
-.bloom i:nth-child(1) { width: 52vw; height: 52vw; left: -14vw; top: -20vw; background: var(--glow); }
-.bloom i:nth-child(2) { width: 34vw; height: 34vw; right: -8vw; top: 22vh; background: var(--glow); opacity: .55; }
-.bloom i:nth-child(3) { width: 40vw; height: 40vw; left: 30vw; bottom: -20vw; background: var(--glow); opacity: .4; }
-
 .masthead, main {
   max-width: 880px;
   margin: 0 auto;
