@@ -189,17 +189,23 @@ const P={
                       // lighter band behind it the headland has nothing to read
                       // against and simply vanishes.
   cliff:1,            // draw the headland. 0 = open water, lamp sits on the horizon
-  cliffX:.76,         // where the cliff face meets the horizon, 0..1
-  cliffH:.085,        // mesa top above the horizon, as a fraction of height.
+  // The headland and tower scale together off one unit, like a single image,
+  // so their proportions hold at any aspect. They used to size off width and
+  // height separately, and on a phone the tower came out wider than the mesa
+  // and hung off the face. The unit is the screen height, capped by width so a
+  // portrait screen does not give the headland most of the frame.
+  cliffSpan:.384,     // headland width from the face to the right edge, in units
+  cliffMaxW:.38,      // most of the screen width the headland may take
+  cliffH:.085,        // mesa top above the horizon, in units.
                       // Floor is about .06: below that the mesa is thinner than
                       // the foot-haze band plus the tower base and reads as a
                       // lump rather than land. .08-.10 is the plausible range for
                       // a flat-topped headland seen from this distance.
   cliffRough:.60,     // how broken the face and top edge are. 0 = clean
-  towerH:.13,         // tower height above the mesa, fraction of height. This
+  towerH:.13,         // tower height above the mesa, in units. This
                       // scales the whole sprite, since its width follows from
                       // the art's aspect ratio.
-  towerW:.0155,       // tower width, fraction of screen width. Only the lit
+  towerW:.0248,       // tower width, in units. Only the lit
                       // glass and halo size off this now -- the sprite's own
                       // width comes from towerH and the art's aspect ratio.
   lampPos:.19,        // where the tower stands on the mesa, 0 = seaward edge,
@@ -214,7 +220,7 @@ const P={
                       // Near zero on purpose: at .75 the wash swamped the lower
                       // two-thirds of the face and flattened the texture out.
   // Surface texture, done in the fragment shader rather than as a bitmap. The
-  // headland is procedural -- its outline regenerates from cliffX/cliffH/
+  // headland is procedural -- its outline regenerates from cliffSpan/cliffH/
   // cliffRough/seed on every resize -- so a PNG would have to freeze that shape,
   // and the fan carries no UVs to paint into. Noise costs a few ALU ops on a
   // small part of the screen and follows the geometry for free.
@@ -1233,12 +1239,13 @@ function buildCliff(){
     CLIFF.lampX=W*P.lampX; CLIFF.lampY=hz-2;
   }
   if(CLIFF.on){
-    CLIFF.x=W*P.cliffX;
-    CLIFF.base=hz+H*0.012;
-    CLIFF.top=hz-H*P.cliffH;
+    const S=Math.min(H, W*P.cliffMaxW/P.cliffSpan);
+    CLIFF.x=W-S*P.cliffSpan;
+    CLIFF.base=hz+S*0.012;
+    CLIFF.top=hz-S*P.cliffH;
     CLIFF.lampX=CLIFF.x+(W-CLIFF.x)*P.lampPos;
-    CLIFF.lampY=CLIFF.top-H*P.towerH;
-    CLIFF.tw=Math.max(3,W*P.towerW);
+    CLIFF.lampY=CLIFF.top-S*P.towerH;
+    CLIFF.tw=Math.max(3,S*P.towerW);
   }
 
   const HN=22;                       // halo fan segments

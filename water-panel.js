@@ -78,7 +78,7 @@ const SLIDERS=[
   ['Lighthouse',null,null,null,null],
   ['sky',        'sky lift',          0,   2,   .05, 2],
   ['cliff',      'headland on',       0,   1,   1,   0],
-  ['cliffX',     'cliff position',    .4,  .95, .01, 2],
+  ['cliffSpan',  'headland width',    .1,  .8,  .01, 3],
   ['cliffH',     'mesa height',       .01, .3,  .005,3],
   ['cliffRough', 'rock roughness',    0,   1.5, .05, 2],
   ['towerH',     'tower height',      0,   .2,  .005,3],
@@ -153,7 +153,7 @@ const rebuildOn={lines:1, ptStep:1};
 // starN is in here too: the count is baked into the table, not read per frame.
 // Plain brightness (stars) is a uniform and is deliberately absent.
 const starsOn={starN:1, starSeed:1, starTextPad:1, starMinGap:1};
-const cliffOn={sky:1, rockLift:1, rockHaze:1, footHaze:1, cliff:1, cliffX:1,
+const cliffOn={sky:1, rockLift:1, rockHaze:1, footHaze:1, cliff:1, cliffSpan:1,
                cliffH:1, cliffRough:1, towerH:1, towerW:1, lampPos:1, seed:1, haze:1,
                beam:1, lampX:1, horizon:1};
 
