@@ -205,8 +205,8 @@ main {
    screenshot the card layout used to lead with. Square, matched to the height
    of the two text lines beside it. */
 .mark {
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
   flex: none;
 }
 
@@ -305,7 +305,7 @@ main {
 @media (max-width: 620px) {
   .row { padding: 16px 16px 18px; }
   .rhead { gap: 12px; margin-bottom: 12px; }
-  .mark { width: 42px; height: 42px; }
+  .mark { width: 48px; height: 48px; }
   .row .arrow { display: none; }
 }
 
