@@ -23,7 +23,7 @@ var MARKS = {
       out+='<path class="s dim" style="stroke-width:1.4" d="M26.8 23 L28.8 22.2"/>';
       // the fake: looks just like the real one, turned so one leg points straight down
       out+='<path class="f" d="'+star+'" transform="translate(23.1,2.9) scale(1.25) rotate(36 4.75 4.9)"/>';
-      return '<g transform="translate(0,4)">'+out+'</g>';
+      return '<g transform="translate(0.9,4.1) scale(0.85)">'+out+'</g>';
     })()
   },
   Chronicle: {
