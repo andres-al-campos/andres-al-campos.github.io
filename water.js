@@ -159,8 +159,8 @@ const P={
                       // unlit lines. Width goes as the log of the gain, so it
                       // moves slower than the number suggests.
   beamSweep:2.0,      // seconds for one crossing
-  beamGapMin:3,       // seconds of dark between sweeps, low end...
-  beamGapMax:10,      // ...and high. Randomised: a FIXED gap is still a metronome,
+  beamGapMin:5,       // seconds of dark between sweeps, low end...
+  beamGapMax:8,       // ...and high. Randomised: a FIXED gap is still a metronome,
                       // just a sparser one, and a predictable beat behind copy
                       // pulls the eye off the text.
   beamDouble:0,       // odds of a double sweep, 1-in-N. 0 = never. Off: a real
