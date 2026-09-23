@@ -3,9 +3,9 @@
      is the water canvas's own clear colour (#111928 in water.js): any other
      value leaves a visible line where the canvas ends. */
   --bg: #111928;
-  --bg2: #18223A;
+  --bg2: rgba(160, 185, 230, .06);
   --line: #26324A;
-  --ink: #E8E6E1;
+  --ink: #E6E9EE;
   --soft: #8F97A6;
   --faint: #5E6676;
   --amber: #EBB450;
@@ -329,7 +329,7 @@ main {
   /* Redefining --ink below is not enough on its own: body already resolved
      color to the light-mode ink, and the h1 inherits that computed value. */
   color: var(--ink);
-  --ink: #E8E6E1;
+  --ink: #E6E9EE;
   --soft: #8A8894;
   --faint: #7E7C88;
   --amber: #EBB450;
