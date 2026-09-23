@@ -123,7 +123,7 @@ const P={
   litGamma:.75,       // <1 lifts the mid-tones, where nearly all the surface sits
   floor:.14,          // darkest a segment gets, as a fraction of full
   crest:1.4,          // extra gain on the sharpest crests
-  glow:2.0,           // halo radius in CSS px. Exponential falloff, not coverage
+  glow:2.4,           // halo radius in CSS px. Exponential falloff, not coverage
   glowAmt:.55,        // its alpha. High: the halo carries the line, not the core
   // The framebuffer is gamma-encoded, so a linear coverage ramp lands darker
   // than the fraction it stands for: half coverage shows as about a fifth of
