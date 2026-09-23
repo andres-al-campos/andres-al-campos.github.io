@@ -68,11 +68,13 @@ const P={
   breakAt:.0008,      // squared-slope threshold where a crest starts to break
   breakRate:6,        // how hard excess steepness is bled off
   visc:.35,           // short-wave-only viscosity
-  damp:.12,           // per-step decay
+  damp:.25,           // per-step decay. Raised from .12 so waves settle after
+                      // their gust passes instead of rolling on indefinitely
   speed:.13,          // simulated seconds per real second
   gustDir:1.0,
   hzSkirt:6, fetch:34, skirt:20,
-  wind:1.15, gustRate:34, gustSize:17,
+  wind:1.66, gustRate:34,  // wind raised with damp (x sqrt(.25/.12)) to keep the sea as busy
+  gustSize:17,
   warmup:25,          // seconds of sim run before the first paint. 0 = start flat
   windDir:1.45, windSpread:.10,
 
@@ -91,6 +93,14 @@ const P={
   veer:.22,           // how far the heading wanders, radians
   veerRate:.10,       // ~77s real
   lull:.30,           // chance a gust is skipped, thinning the field in the lulls
+  // Long swell, drawn analytically on top of the sim. The sim is a plain wave
+  // equation, so every wavelength travels at one speed -- a drum skin, not the
+  // sea. In deep water speed goes as the square root of wavelength, so long
+  // swell outruns the chop riding on it and the surface keeps changing shape.
+  // Three trains at that speed, summed in the vertex shader; no sim cost.
+  swellAmp:.1,        // height, in sim units. 0 = off
+  swellLen:90,        // longest wavelength, in sim cells. The others are .62x and .4x
+  swellSpeed:1.0,     // overall pace. Relative speeds follow sqrt(length) regardless
   swell2:.50, swell2Ang:.9, swell2Len:1.7, swell2Crest:0.7, swell2Amp:1.4,
 
   // --- look ---
@@ -417,6 +427,7 @@ uniform vec2 lampP;
 uniform float guard;
 uniform vec4 guardBox;   // x0,y0,x1,y1 in CSS px
 uniform float glowW;                 // 0 for the core pass, >0 for the glow pass
+uniform float swellAmp, swellLen, swellSpeed, swellT, windDir;
 varying float vNear;
 varying float vLit;                  // 0..1 shading, before colour
 varying float vWarm;                 // 0..1 how much beam this vertex catches
@@ -462,6 +473,25 @@ float hAt(vec2 g){
   return mix(mix(h00,h10,f.x), mix(h01,h11,f.x), f.y);
 }
 
+// Sum of three long trains, in sim cells so the wavelengths match the sim's
+// scale. Headings fan around the wind so the crests cross rather than march in
+// lockstep; phase speed is sqrt(length), the deep-water dispersion relation.
+float swellAt(vec2 g){
+  if(swellAmp<=0.0) return 0.0;
+  vec2 c=g*vec2(simW, simH);
+  float h=0.0;
+  for(int n=0;n<3;n++){
+    float fn=float(n);
+    float L=swellLen*pow(0.62,fn);
+    float ang=windDir+(fn-1.0)*0.35;
+    vec2 k=vec2(cos(ang), sin(ang))*(6.2832/L);
+    float w=6.2832/L*sqrt(L)*swellSpeed;   // k*c, c ~ sqrt(L)
+    h+=pow(0.6,fn)*sin(dot(k,c)-w*swellT+fn*2.1);
+  }
+  return h*swellAmp;
+}
+float heightAt(vec2 g){ return hAt(g)+swellAt(g); }
+
 vec2 pointAt(float i, float j){
   float u=rowU(i);
   // Rows are spaced by a power law, so they crowd toward the horizon the way a
@@ -471,7 +501,7 @@ vec2 pointAt(float i, float j){
   // Sample BELOW the fetch band: those rows are simulated but never drawn, so
   // waves arrive already formed instead of materialising mid-scene.
   float x=-40.0 + j*step;
-  float hgt=hAt(gridAt(i,j))*simGain;
+  float hgt=heightAt(gridAt(i,j))*simGain;
   float a2=(res.y-hz)*amp*(ampFar+near*ampNear);
   return vec2(x, y0 - hgt*a2);
 }
@@ -496,9 +526,9 @@ void main(){
   // texture sample is already bilinear across a grid coarser than the point
   // spacing, which does the smoothing for free.
   vec2 g=gridAt(a.x,a.y);
-  float hC=hAt(g);
-  float dX=hAt(gridAt(a.x,a.y+1.0))-hAt(gridAt(a.x,a.y-1.0));
-  float dY=hAt(g+vec2(0.,1.5/simH))-hAt(g-vec2(0.,1.5/simH));
+  float hC=heightAt(g);
+  float dX=heightAt(gridAt(a.x,a.y+1.0))-heightAt(gridAt(a.x,a.y-1.0));
+  float dY=heightAt(g+vec2(0.,1.5/simH))-heightAt(g-vec2(0.,1.5/simH));
 
   // Height term: bright at the crest. Slope term: bright on the flank facing up.
   float litH=clamp(hC*simGain*0.5+0.5, 0.0, 1.0);
@@ -1767,6 +1797,11 @@ function frame(now){
   gl.uniform1f(U('amp'),P.amp);   gl.uniform1f(U('ampNear'),P.ampNear);
   gl.uniform1f(U('ampFar'),P.ampFar);
   gl.uniform1f(U('simGain'),P.simGain);
+  gl.uniform1f(U('swellAmp'),P.swellAmp);
+  gl.uniform1f(U('swellLen'),P.swellLen);
+  gl.uniform1f(U('swellSpeed'),P.swellSpeed);
+  gl.uniform1f(U('swellT'),performance.now()/1000);
+  gl.uniform1f(U('windDir'),P.windDir);
   gl.uniform1f(U('simW'),GW);
   gl.uniform1f(U('simH'),GH);
   gl.uniform1f(U('fetch'),P.fetch);
