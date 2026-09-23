@@ -125,6 +125,11 @@ const P={
   crest:1.4,          // extra gain on the sharpest crests
   glow:3.0,           // halo radius in CSS px. Exponential falloff, not coverage
   glowAmt:.55,        // its alpha. High: the halo carries the line, not the core
+  // The framebuffer is gamma-encoded, so a linear coverage ramp lands darker
+  // than the fraction it stands for: half coverage shows as about a fifth of
+  // the brightness, and edges read thin and ropey on diagonals. Raising
+  // coverage to 1/edgeGamma puts the ramp back in perceived brightness.
+  edgeGamma:2.2,      // 1 = linear, as before. 2.2 = full sRGB correction
   glowFloor:.5,     // how much of the halo ignores wave shading. 0 = halo
                       // tracks brightness (dim lines get no halo, so no edge
                       // ramp, so they look aliased); 1 = every line gets the
@@ -618,7 +623,7 @@ varying float vWarm;
 varying float vEdge;
 varying float vHalf;
 varying float vCov;
-uniform float dimFar, bright, beamWarm, beamSat, alphaMul, isGlow, glowFloor, beamGain;
+uniform float dimFar, bright, beamWarm, beamSat, alphaMul, isGlow, glowFloor, beamGain, edgeGamma;
 void main(){
   float a=(dimFar+(1.0-dimFar)*vNear)*bright*vLit;
 
@@ -633,6 +638,7 @@ void main(){
   // the worst of both. smoothstep rather than a linear ramp because the linear
   // one leaves visible corners in the gradient where it clamps.
   float cov=1.0-smoothstep(vHalf-0.5, vHalf+0.5, abs(vEdge));
+  cov=pow(cov, 1.0/edgeGamma);
 
   // The glow pass is not a wider line -- it is light spilling past the geometry,
   // so it falls off exponentially from the centreline rather than by coverage.
@@ -1802,6 +1808,7 @@ function frame(now){
   // blending means the core pass then sits on top of its own halo. On Canvas this
   // was the single most expensive thing in the frame -- it doubled every stroke --
   // and here it is one extra draw call of the same buffer.
+  gl.uniform1f(U('edgeGamma'),P.edgeGamma);
   if(P.glow>0 && P.glowAmt>0){
     gl.uniform1f(U('glowW'),P.glow);   // CSS px, same space as lineW
     gl.uniform1f(U('alphaMul'),P.glowAmt);
