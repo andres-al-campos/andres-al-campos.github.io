@@ -21,7 +21,7 @@ const PROJECTS = [
   },
   {
     name: "Ansa",
-    tagline: "Break tasks down until the leaves are small enough to do.",
+    tagline: "Break big tasks down until the next step is small enough to do.",
     blurb:
       "A to-do list where a task is a tree and progress rolls up from the leaves, so every branch shows how far along it is. On web, iOS, and desktop, all against the same tree.",
     tags: ["TypeScript", "React", "Swift", "Electron", "SQLite", "MCP"],
