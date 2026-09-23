@@ -9,22 +9,20 @@ var MARKS = {
        + '<circle class="f" cx="16" cy="16" r="1.6"/>'
   },
   Momus: {
-    d: 'A rating with its third star popped out of the socket',
+    d: 'One real star, and a fake one popped out of its socket',
     svg: (function(){
       // one star, 9.5 wide, around (4.75,4.54). Deep inner radius = sharp points.
       var star='M4.75 0 L6.15 3.29 L9.5 3.66 L6.99 6.14 L7.68 9.71 L4.75 7.84 L1.82 9.71 L2.51 6.14 L0 3.66 L3.35 3.29 Z';
       var out='';
-      // two real stars bright; the third slot stays as the faint empty socket
-      for(var i=0;i<3;i++){
-        var cls = i===2 ? 'f dim' : 'f';
-        out+='<path class="'+cls+'" d="'+star+'" transform="translate('+(0.9+i*10.1)+',17)"/>';
-      }
+      // the real star, and beside it the faint empty socket
+      out+='<path class="f" d="'+star+'" transform="translate(1,14) scale(1.35)"/>';
+      out+='<path class="f dim" d="'+star+'" transform="translate(15.5,14) scale(1.35)"/>';
       // short burst lines around the socket: popped, not fallen
-      out+='<path class="s dim" style="stroke-width:1.4" d="M24.2 16.2 L23.2 14.4"/>';
-      out+='<path class="s dim" style="stroke-width:1.4" d="M27.6 16.2 L28.8 14.6"/>';
-      out+='<path class="s dim" style="stroke-width:1.4" d="M30.6 19.4 L32 18.8"/>';
-      // the fake star: hollow, lit, tilted as it flies up out of the socket
-      out+='<path class="s lit" style="stroke-width:1.1" d="'+star+'" transform="translate(21.3,3) rotate(22 4.75 4.9)"/>';
+      out+='<path class="s dim" style="stroke-width:1.4" d="M19 13.2 L17.8 11"/>';
+      out+='<path class="s dim" style="stroke-width:1.4" d="M23.8 13 L25.4 11"/>';
+      out+='<path class="s dim" style="stroke-width:1.4" d="M28.3 17.6 L30.2 16.8"/>';
+      // the fake: hollow, lit, tilted, up and to the right clear of the burst
+      out+='<path class="s lit" style="stroke-width:1" d="'+star+'" transform="translate(23.2,-2) scale(1.1) rotate(22 4.75 4.9)"/>';
       return out;
     })()
   },
