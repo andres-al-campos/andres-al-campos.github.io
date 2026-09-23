@@ -1,33 +1,20 @@
 :root {
-  --bg: #F7F5F1;
-  --bg2: #FFFFFF;
-  --line: #E4E0D8;
-  --ink: #16171B;
-  --soft: #5C5A63;
-  --faint: #8E8B95;
-  --amber: #B4701A;
-  --glow: rgba(180, 112, 26, .10);
-  --chip: #F1EEE8;
-  --pill-bg: #FFFFFF;
-  --card: 0 1px 2px rgba(26, 26, 24, .04), 0 6px 20px rgba(26, 26, 24, .05);
-  --card-lift: 0 2px 4px rgba(26, 26, 24, .06), 0 16px 38px rgba(26, 26, 24, .10);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0B0D12;
-    --bg2: #12151C;
-    --line: #1E222C;
-    --ink: #E8E6E1;
-    --soft: #8A8894;
-    --faint: #5D5B67;
-    --amber: #E8A24C;
-    --glow: rgba(232, 162, 76, .16);
-    --chip: #181B23;
-    --pill-bg: #151821;
-    --card: 0 1px 2px rgba(0, 0, 0, .16), 0 6px 20px rgba(0, 0, 0, .10);
-    --card-lift: 0 2px 4px rgba(0, 0, 0, .2), 0 16px 38px rgba(0, 0, 0, .22);
-  }
+  /* One dark palette for everyone. The page continues the hero's sea, so --bg
+     is the water canvas's own clear colour (#111928 in water.js): any other
+     value leaves a visible line where the canvas ends. */
+  --bg: #111928;
+  --bg2: #121722;
+  --line: #1F2633;
+  --ink: #E8E6E1;
+  --soft: #8F97A6;
+  --faint: #5E6676;
+  --amber: #E8A24C;
+  --glow: rgba(232, 162, 76, .16);
+  --chip: #181E2A;
+  --pill-bg: #151A24;
+  --card: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .25);
+  --card-lift: 0 2px 4px rgba(0, 0, 0, .35), 0 16px 38px rgba(0, 0, 0, .4);
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
