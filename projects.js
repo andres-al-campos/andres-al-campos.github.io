@@ -23,7 +23,7 @@ const PROJECTS = [
     name: "Ansa",
     tagline: "Break big tasks down until the next step is small enough to do.",
     blurb:
-      "A to-do list where a task is a tree and progress rolls up from the leaves, so every branch shows how far along it is. On web, iOS, and desktop, all against the same tree.",
+      "A to-do list where every task is a tree. Break a task into subtasks, then those into smaller ones, and progress rolls up from the leaves, so each branch shows how far along it is. It runs on the web, iOS, and desktop against the same tree, and an MCP server lets Claude read and edit it too.",
     tags: ["TypeScript", "React", "Swift", "Electron", "SQLite", "MCP"],
     repo: "https://github.com/andres-al-campos/Ansa",
   },
