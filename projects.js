@@ -23,7 +23,7 @@ const PROJECTS = [
     name: "Ansa",
     tagline: "Break big tasks down until the next step is small enough to do.",
     blurb:
-      "A to-do list where every task is a tree. Break a task into subtasks, then those into smaller ones, and progress rolls up from the leaves, so each branch shows how far along it is. It runs on the web, iOS, and desktop against the same tree, and an MCP server lets Claude read and edit it too.",
+      "A to-do list where every task is a tree. Break a task into subtasks, then those into smaller ones, and progress rolls up from the leaves, so each branch shows how far along it is. It runs on the web, iOS, and desktop against the same tree, and an MCP server lets any AI agent read and edit it too.",
     tags: ["TypeScript", "React", "Swift", "Electron", "SQLite", "MCP"],
     repo: "https://github.com/andres-al-campos/Ansa",
   },
@@ -48,7 +48,7 @@ const PROJECTS = [
     name: "Chronicle",
     tagline: "A personal encyclopedia of your Claude conversations.",
     blurb:
-      "A searchable archive of everything you have said to Claude, built on your own machine from an export of your history. Every conversation gets a markdown summary, and those roll up into half-month, quarter, and year entries, so a question about what you decided six months ago has somewhere to land. An MCP server hands the whole thing back to Claude to read.",
+      "A searchable archive of everything you have said to Claude, built on your own machine from an export of your history. Every conversation gets a markdown summary, and those roll up into half-month, quarter, and year entries, so a question about what you decided six months ago has somewhere to land. An MCP server lets any AI agent search and read it.",
     tags: ["Python", "MCP", "browser extension"],
     repo: "https://github.com/andres-al-campos/Chronicle",
   },
@@ -64,7 +64,7 @@ const PROJECTS = [
     name: "Etymon",
     tagline: "Find the word that connects a set of words.",
     blurb:
-      "Give it cat and lion and it finds the words sitting close to both, then shows the path it walked to get there: lion, leopard, cats. Useful for naming a category, brainstorming, or word games.",
+      "Give it cat and lion and it finds the words sitting close to both, then shows the path it walked to get there: lion, leopard, cats. It runs two searches at once, a quick overlap of each word's nearest neighbors and a deeper walk through a graph of word embeddings, then ranks every candidate by its strongest link.",
     tags: ["Python", "local server", "CLI", "embeddings", "graph search"],
     repo: "https://github.com/andres-al-campos/Etymon",
   },
