@@ -14,7 +14,7 @@ const PROJECTS = [
     name: "WebTime",
     tagline: "Track and take control of your time.",
     blurb:
-      "A browser extension that tracks where your time goes, with a small timer in the corner of the page. The limits are strict enough to actually lower usage and loose enough that you keep the extension installed. Browsing a site runs in sessions: go past one and a cooldown blocks the page, but stop early and the unused time rolls over to the next. Nudges get more frequent as a session nears its end, and a bar drains across the last minute.",
+      "A browser extension that breaks your browsing into sessions and shows how much time goes where. The limits are strict enough to actually lower usage and loose enough that you keep the extension installed. When a session ends, the site is blocked for a cooldown; stop early and the unused time rolls over to the next one. Charts of each day against a seven-day average show the trend over time.",
     tags: ["TypeScript", "browser extension"],
     repo: "https://github.com/andres-al-campos/WebTime",
     image: "img/webtime.png",
