@@ -14,7 +14,7 @@ const PROJECTS = [
     name: "WebTime",
     tagline: "Track and take control of your time.",
     blurb:
-      "A browser extension that tracks where your time goes, by session and by day. The limits are strict enough to actually lower usage and loose enough that you keep the extension installed, which most blockers get wrong in one direction or the other. Warnings start well before a limit, with a wind-down in the last minute.",
+      "A browser extension that tracks where your time goes, by session and by day, with a small timer in the corner of the page. The limits are strict enough to actually lower usage and loose enough that you keep the extension installed. Most of the time it just keeps you informed, with a nudge as you near your usual usage and a wind-down in the last minute. Only once a session is over does a cooldown block the page.",
     tags: ["TypeScript", "browser extension"],
     repo: "https://github.com/andres-al-campos/WebTime",
     image: "img/webtime.png",
