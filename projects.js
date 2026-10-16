@@ -8,8 +8,9 @@
 //   tags      required — short, lowercase-ish; shown as chips
 //   repo      required — full URL
 //   image     optional — path under img/. Not rendered: the card leads with its mark.
-//   video     optional — a short muted MP4 under img/, played while the card is hovered
-//   poster    with video — the clip's first frame, so rewinding on leave doesn't jump
+//   video     optional — a short muted MP4 under img/, played while the card has attention
+//   poster    with video — a still taken from the clip
+//   posterAt  with video — the second the poster was taken at; a stopped clip rewinds there
 
 const PROJECTS = [
   {
@@ -55,6 +56,17 @@ const PROJECTS = [
     repo: "https://github.com/andres-al-campos/Chronicle",
   },
   {
+    name: "Vault",
+    tagline: "Archive a YouTube channel and watch it offline.",
+    blurb:
+      "A macOS app that downloads a whole channel, or only its most popular videos, and fetches just what's new each time you run it again. Everything plays in a built-in player, and each video you open gets a tab that keeps your place.",
+    tags: ["Rust", "Tauri", "JavaScript", "macOS", "yt-dlp"],
+    repo: "https://github.com/andres-al-campos/Vault",
+    video: "img/vault.mp4",
+    poster: "img/vault.jpg",
+    posterAt: 3.2,
+  },
+  {
     name: "Somnya",
     tagline: "Sleep measured, not scored.",
     blurb:
@@ -77,23 +89,5 @@ const PROJECTS = [
       "Sideloaded apps stop opening when their signature runs out, usually on the morning you need one. ReSign watches your Xcode projects from the menu bar and rebuilds and reinstalls to your iPhone two hours before that happens, and checks again every time the Mac wakes.",
     tags: ["Swift", "macOS"],
     repo: "https://github.com/andres-al-campos/ReSign",
-  },
-  {
-    name: "Sundial",
-    tagline: "Schedule your monitor's brightness by time of day.",
-    blurb:
-      "A macOS menu bar app that holds a set of brightness and contrast presets and moves between them through the day, easing each change in over a minute. Bright enough to work by at noon, dim enough to sit with at midnight, and you never touch the buttons on the monitor to get there.",
-    tags: ["Swift", "macOS", "monitor control"],
-    repo: "https://github.com/andres-al-campos/Sundial",
-  },
-  {
-    name: "Vault",
-    tagline: "Keep a YouTube channel and watch it offline.",
-    blurb:
-      "A macOS app that archives a YouTube channel and plays its videos in a built-in player, no connection needed. Download the whole channel or only its most popular videos, and run it again later to fetch just what's new. Every video you open gets a tab that keeps your place.",
-    tags: ["Rust", "Tauri", "JavaScript", "macOS", "yt-dlp"],
-    repo: "https://github.com/andres-al-campos/Vault",
-    video: "img/vault.mp4",
-    poster: "img/vault.jpg",
   },
 ];

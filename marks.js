@@ -104,11 +104,10 @@ var MARKS = {
        + '<path class="s" style="stroke-width:2.8;opacity:.45" d="M26 13.5 L26 18.5"/>'
   },
   Vault: {
-    d: 'A vault door with a play button for a dial',
-    svg: '<rect class="s dim" x="4" y="4.5" width="24" height="23" rx="3"/>'
-       + '<path class="s dim" d="M7 10 L7 13 M7 19 L7 22"/>'
-       + '<circle class="s" cx="17" cy="16" r="8"/>'
-       + '<path class="f lit" d="M15 12.6 L20.6 16 L15 19.4 Z"/>'
+    d: 'The app icon: a squircle, and a play button turned down to read as download',
+    svg: '<rect class="s" style="opacity:.55" x="4" y="4" width="24" height="24" rx="7"/>'
+       + '<path class="f lit" d="M10.5 11.5 L21.5 11.5 L16 21 Z"/>'
+       + '<path class="s lit" style="stroke-width:1.4" d="M10.5 11.5 L21.5 11.5 L16 21 Z"/>'
   },
   Almanac: {
     d: 'A calendar, one date lit',
