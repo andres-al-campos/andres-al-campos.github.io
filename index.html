@@ -37,8 +37,8 @@
 
 
 <script src="water.js?v=11"></script>
-<script src="marks.js?v=16"></script>
-<script src="projects.js?v=13"></script>
+<script src="marks.js?v=17"></script>
+<script src="projects.js?v=14"></script>
 <script>
 (function () {
   var grid = document.getElementById('grid');
@@ -80,12 +80,20 @@
     return a;
   }
 
-  // A demo clip plays only while the pointer is on its card, never on its own:
-  // a grid of autoplaying cards pulls the eye off the one being read. Leaving
-  // rewinds to 0, and the poster is the clip's first frame, so the rewound clip
-  // looks exactly like the still it started as. Phones have no hover and keep
-  // the poster; so does reduced motion.
-  var canHover = matchMedia('(hover: hover) and (prefers-reduced-motion: no-preference)');
+  // A demo clip plays only while it has the reader's attention, never on its
+  // own: a grid of autoplaying cards pulls the eye off the one being read. With
+  // a pointer that means while the card is hovered. On a touch screen with one
+  // card across, the card in view is the one being read, so its clip plays
+  // while it is on screen; with two across it keeps the poster. Each play
+  // starts from 0. Stopping rewinds to the moment the poster was taken from,
+  // so the stopped clip and the still are the same picture. Reduced motion
+  // keeps the poster everywhere.
+  var canHover = matchMedia('(hover: hover)');
+  var motionOK = matchMedia('(prefers-reduced-motion: no-preference)');
+
+  function oneAcross() {
+    return getComputedStyle(grid).gridTemplateColumns.split(' ').length === 1;
+  }
 
   function clip(card, p) {
     var v = el('video', 'clip');
@@ -93,18 +101,30 @@
     v.poster = p.poster;
     v.muted = true;
     v.playsInline = true;
-    v.preload = 'none';   // nothing is fetched until the first hover
+    v.preload = 'none';   // nothing is fetched until the first play
     v.setAttribute('aria-hidden', 'true');
-    card.addEventListener('pointerenter', function () {
-      if (!canHover.matches) return;
+
+    function start() {
+      if (!motionOK.matches) return;
       v.currentTime = 0;
-      // Rejects with AbortError when the pointer leaves before playback starts.
+      // Rejects with AbortError when stop() comes before playback starts.
       v.play().catch(function () {});
-    });
-    card.addEventListener('pointerleave', function () {
+    }
+    function stop() {
       v.pause();
-      v.currentTime = 0;
-    });
+      // Before the clip has loaded this sets where it will open instead.
+      v.currentTime = p.posterAt || 0;
+    }
+
+    if (canHover.matches) {
+      card.addEventListener('pointerenter', start);
+      card.addEventListener('pointerleave', stop);
+    } else {
+      new IntersectionObserver(function (entries) {
+        var e = entries[entries.length - 1];
+        if (e.intersectionRatio >= .9 && oneAcross()) start(); else if (!v.paused) stop();
+      }, { threshold: [0, .9] }).observe(v);
+    }
     return v;
   }
 

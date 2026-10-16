@@ -4,6 +4,11 @@
 
 Look-and-feel calls that hold across the site, with the reason given at the time.
 
-- 2026-10-15. A card's demo clip plays on hover, never on its own. A grid where every
-  card autoplays pulls attention off the card being read. It restarts from the start on
-  each hover and rewinds on leave, with the first frame as the poster, so nothing jumps.
+- 2026-10-15. A card's demo clip plays only while it has the reader's attention: on
+  hover with a pointer, and on a phone while it is the card on screen. A grid where every
+  card autoplays pulls attention off the card being read; with one card across, the card
+  in view is the one being read. Tablets with two across keep the poster.
+- 2026-10-15. The poster is a frame with something happening in it, not the clip's first
+  frame. Vault's first frame was its empty "Add a channel" screen, and the user found the
+  channel page "way better" even though the card cuts to the empty screen when the clip
+  starts. A stopped clip rewinds to the poster's frame, so stopping doesn't jump.

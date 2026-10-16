@@ -20,16 +20,18 @@ array.
 
 ## Demo clips
 
-A card can also carry a short demo: `video` and `poster`, both under `img/`. The clip
-plays only while the card is hovered, from the start each time, and rewinds to the start
-when the pointer leaves. Phones, and anyone with reduced motion set, see the poster. Make
-the poster the clip's first frame, so the rewind looks the same as the still. Encode at
-960px wide, silent, with the index up front:
+A card can also carry a short demo: `video` and `poster` under `img/`, and `posterAt`, the
+second of the clip the poster was taken from. With a pointer the clip plays while the card
+is hovered. On a touch screen with one card across it plays while the card is on screen;
+with two across it shows the poster. Every play starts from 0, and a stopped clip rewinds
+to `posterAt`, so it settles back on the same picture as the poster. Reduced motion shows
+the poster only. Encode at 960px wide, silent, with the index up front, and take the poster
+from a moment where the screen holds still:
 
 ```bash
 ffmpeg -i tour.mp4 -an -vf "scale=960:-2:flags=lanczos,format=yuv420p" \
   -c:v libx264 -crf 24 -preset slow -movflags +faststart img/thing.mp4
-ffmpeg -i img/thing.mp4 -frames:v 1 -q:v 3 img/thing.jpg
+ffmpeg -ss 3.2 -i img/thing.mp4 -frames:v 1 -q:v 3 img/thing.jpg   # posterAt: 3.2
 ```
 
 ## Marks
