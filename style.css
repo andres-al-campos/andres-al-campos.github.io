@@ -340,19 +340,88 @@ main {
   overflow: visible;
   max-width: none;
   max-height: none;
-  width: min(1280px, 94vw, calc(86vh * 1.6));
+  width: min(1280px, 94vw, calc((86vh - 40px) * 1.6));
 }
 
 .viewer::backdrop { background: rgba(5, 7, 12, .84); }
 
 .viewer video {
   display: block;
+  cursor: pointer;
   width: 100%;
   aspect-ratio: 16 / 10;
   border-radius: 10px;
   background: #000;
   box-shadow: var(--card-lift);
 }
+
+/* The viewer's controls sit under the picture, never on it. */
+.vbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px 0;
+  color: var(--soft);
+  font: 500 12.5px ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.vplay {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.vplay svg { width: 14px; height: 14px; fill: currentColor; }
+.vplay:focus-visible, .vseek:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+.vseek {
+  flex: 1;
+  min-width: 0;
+  height: 16px;
+  margin: 0;
+  background: none;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.vseek::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--amber) var(--at, 0%), var(--line) var(--at, 0%));
+}
+.vseek::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--amber) var(--at, 0%), var(--line) var(--at, 0%));
+}
+
+.vseek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px;
+  height: 11px;
+  margin-top: -4px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--amber);
+}
+.vseek::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--amber);
+}
+
+.vtime { flex: none; font-variant-numeric: tabular-nums; }
 
 .vclose {
   position: absolute;

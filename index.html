@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alex Campos — tools that help you find your way</title>
 <meta name="description" content="Small tools I built because I kept wishing they existed: a web browsing time manager, a tree-based to-do list, and an apartment review analyzer.">
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
 
@@ -162,7 +162,10 @@
     return c.toDataURL('image/jpeg', .85);
   }
 
-  // One viewer for every card: the clip at full size, with controls. It picks
+  // One viewer for every card: the clip at full size, with its controls in a
+  // bar underneath rather than the browser's own over the picture. Those darken
+  // the frame whenever they show, and they land on top of the recorded app's
+  // own player bar. It picks
   // up where the card's preview was, since the click means "this, bigger". It
   // grows out of the card's clip and shrinks back into it, so the eye can
   // follow where it came from and where it went.
@@ -170,13 +173,49 @@
   var big = el('video');
   big.muted = true;
   big.playsInline = true;
-  big.controls = true;
   var shut = el('button', 'vclose', '\u00d7');
   shut.type = 'button';
   shut.setAttribute('aria-label', 'Close');
+
+  var bar = el('div', 'vbar');
+  var toggle = el('button', 'vplay');
+  toggle.type = 'button';
+  var seek = el('input', 'vseek');
+  seek.type = 'range';
+  seek.min = 0;
+  seek.step = 'any';
+  seek.value = 0;
+  seek.setAttribute('aria-label', 'Position');
+  var clock = el('span', 'vtime');
+  bar.appendChild(toggle);
+  bar.appendChild(seek);
+  bar.appendChild(clock);
+
   viewer.appendChild(big);
+  viewer.appendChild(bar);
   viewer.appendChild(shut);
   document.body.appendChild(viewer);
+
+  var PLAY = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3 L13 8 L4.5 13 Z"/></svg>';
+  var PAUSE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3h3v10H4zM9 3h3v10H9z"/></svg>';
+
+  function mmss(t) {
+    t = Math.max(0, Math.floor(t || 0));
+    return Math.floor(t / 60) + ':' + ('0' + t % 60).slice(-2);
+  }
+  function paint() {
+    toggle.innerHTML = big.paused ? PLAY : PAUSE;
+    toggle.setAttribute('aria-label', big.paused ? 'Play' : 'Pause');
+    if (big.duration) seek.max = big.duration;
+    seek.value = big.currentTime;
+    seek.style.setProperty('--at', (big.duration ? big.currentTime / big.duration * 100 : 0) + '%');
+    clock.textContent = mmss(big.currentTime) + ' / ' + mmss(big.duration);
+  }
+  function playPause() { if (big.paused) big.play().catch(function () {}); else big.pause(); }
+  ['play', 'pause', 'timeupdate', 'loadedmetadata', 'seeked'].forEach(function (e) { big.addEventListener(e, paint); });
+  toggle.addEventListener('click', playPause);
+  big.addEventListener('click', playPause);
+  seek.addEventListener('input', function () { big.currentTime = +seek.value; paint(); });
   var from = null;   // the card clip the viewer grew out of
   var EASE = 'cubic-bezier(.2, .7, .3, 1)';
 
@@ -196,6 +235,7 @@
     animate(viewer, { transform: [overClip(), 'none'] }, { duration: 320, easing: EASE });
     animate(viewer, { opacity: [0, 1] }, { duration: 320, easing: EASE, pseudoElement: '::backdrop' });
     animate(shut, { opacity: [0, 0, 1] }, { duration: 320 });
+    animate(bar, { opacity: [0, 0, 1] }, { duration: 320 });
   }
 
   function shrink() {
@@ -208,6 +248,7 @@
     var a = animate(viewer, { transform: ['none', overClip()] }, opts);
     animate(viewer, { opacity: [1, 0] }, Object.assign({ pseudoElement: '::backdrop' }, opts));
     animate(shut, { opacity: [1, 0] }, { duration: 120, fill: 'forwards' });
+    animate(bar, { opacity: [1, 0] }, { duration: 120, fill: 'forwards' });
     if (!a) { viewer.close(); return; }
     a.onfinish = function () {
       viewer.close();
@@ -231,6 +272,7 @@
     big.poster = still;
     big.src = p.video;
     big.addEventListener('loadedmetadata', function () { big.currentTime = t; }, { once: true });
+    paint();
     viewer.showModal();
     grow();
     big.play().catch(function () {});
