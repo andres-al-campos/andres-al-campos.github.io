@@ -5,22 +5,32 @@ no dependencies. Push to `main` and GitHub Pages serves it.
 
 ## Adding a project
 
-Append an object to the array in `projects.js`. The page builds the cards and the filter
-row from that array.
+Append an object to the array in `projects.js`. The page builds the cards from that
+array.
 
 ```js
 {
   name: "Thing",
   tagline: "One line, the pitch.",
   blurb: "One to three sentences: what it does and why it exists.",
-  tags: ["Swift", "SwiftUI"],
-  platform: "macos",              // browser | macos | ios | tools
+  tags: ["Swift", "SwiftUI", "macOS"],   // the platform goes in the tags
   repo: "https://github.com/andres-al-campos/Thing",
 }
 ```
 
-A new `platform` value needs a label in the `LABELS` map in `index.html` and an entry
-in the ordered list just below it. Everything else is automatic.
+## Demo clips
+
+A card can also carry a short demo: `video` and `poster`, both under `img/`. The clip
+plays only while the card is hovered, from the start each time, and rewinds to the start
+when the pointer leaves. Phones, and anyone with reduced motion set, see the poster. Make
+the poster the clip's first frame, so the rewind looks the same as the still. Encode at
+960px wide, silent, with the index up front:
+
+```bash
+ffmpeg -i tour.mp4 -an -vf "scale=960:-2:flags=lanczos,format=yuv420p" \
+  -c:v libx264 -crf 24 -preset slow -movflags +faststart img/thing.mp4
+ffmpeg -i img/thing.mp4 -frames:v 1 -q:v 3 img/thing.jpg
+```
 
 ## Marks
 
