@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alex Campos — tools that help you find your way</title>
 <meta name="description" content="Small tools I built because I kept wishing they existed: a web browsing time manager, a tree-based to-do list, and an apartment review analyzer.">
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
 
@@ -120,9 +120,9 @@
     box.appendChild(v);
     box.appendChild(cue);
     box.addEventListener('click', function () {
-      var t = v.currentTime;
+      var t = v.currentTime, still = frame(v);
       stop();
-      openViewer(p, t);
+      openViewer(p, t, still, v);
     });
 
     function start() {
@@ -151,8 +151,21 @@
 
   var EXPAND = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/></svg>';
 
+  // The picture the card is showing right now, so the viewer opens on it
+  // rather than on black while its own copy of the clip loads.
+  function frame(v) {
+    if (v.readyState < 2) return v.poster;
+    var c = document.createElement('canvas');
+    c.width = v.videoWidth;
+    c.height = v.videoHeight;
+    c.getContext('2d').drawImage(v, 0, 0);
+    return c.toDataURL('image/jpeg', .85);
+  }
+
   // One viewer for every card: the clip at full size, with controls. It picks
-  // up where the card's preview was, since the click means "this, bigger".
+  // up where the card's preview was, since the click means "this, bigger". It
+  // grows out of the card's clip and shrinks back into it, so the eye can
+  // follow where it came from and where it went.
   var viewer = el('dialog', 'viewer');
   var big = el('video');
   big.muted = true;
@@ -164,15 +177,62 @@
   viewer.appendChild(big);
   viewer.appendChild(shut);
   document.body.appendChild(viewer);
-  shut.addEventListener('click', function () { viewer.close(); });
-  // A click on the backdrop lands on the dialog itself.
-  viewer.addEventListener('click', function (e) { if (e.target === viewer) viewer.close(); });
-  viewer.addEventListener('close', function () { big.pause(); big.removeAttribute('src'); big.load(); });
+  var from = null;   // the card clip the viewer grew out of
+  var EASE = 'cubic-bezier(.2, .7, .3, 1)';
 
-  function openViewer(p, t) {
+  // The transform that lays the viewer exactly over the card's clip. Both are
+  // 16:10, so one scale fits.
+  function overClip() {
+    var a = from.getBoundingClientRect(), b = viewer.getBoundingClientRect();
+    return 'translate(' + (a.left - b.left) + 'px, ' + (a.top - b.top) + 'px) scale(' + (a.width / b.width) + ')';
+  }
+
+  function animate(el, frames, opts) {
+    try { return el.animate(frames, opts); } catch (e) { return null; }
+  }
+
+  function grow() {
+    if (!motionOK.matches) return;
+    animate(viewer, { transform: [overClip(), 'none'] }, { duration: 320, easing: EASE });
+    animate(viewer, { opacity: [0, 1] }, { duration: 320, easing: EASE, pseudoElement: '::backdrop' });
+    animate(shut, { opacity: [0, 0, 1] }, { duration: 320 });
+  }
+
+  function shrink() {
+    if (!viewer.open) return;
+    if (!motionOK.matches || !from) { viewer.close(); return; }
+    big.pause();
+    // Closing mid-grow: measure from the viewer's resting place, not mid-flight.
+    viewer.getAnimations({ subtree: true }).forEach(function (x) { x.cancel(); });
+    var opts = { duration: 260, easing: EASE, fill: 'forwards' };
+    var a = animate(viewer, { transform: ['none', overClip()] }, opts);
+    animate(viewer, { opacity: [1, 0] }, Object.assign({ pseudoElement: '::backdrop' }, opts));
+    animate(shut, { opacity: [1, 0] }, { duration: 120, fill: 'forwards' });
+    if (!a) { viewer.close(); return; }
+    a.onfinish = function () {
+      viewer.close();
+      viewer.getAnimations({ subtree: true }).forEach(function (x) { x.cancel(); });
+    };
+  }
+
+  shut.addEventListener('click', shrink);
+  // A click on the backdrop lands on the dialog itself.
+  viewer.addEventListener('click', function (e) { if (e.target === viewer) shrink(); });
+  viewer.addEventListener('cancel', function (e) { e.preventDefault(); shrink(); });   // Esc
+  viewer.addEventListener('close', function () {
+    big.pause();
+    big.removeAttribute('src');
+    big.removeAttribute('poster');
+    big.load();
+  });
+
+  function openViewer(p, t, still, clipEl) {
+    from = clipEl;
+    big.poster = still;
     big.src = p.video;
     big.addEventListener('loadedmetadata', function () { big.currentTime = t; }, { once: true });
     viewer.showModal();
+    grow();
     big.play().catch(function () {});
   }
 

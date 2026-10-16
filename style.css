@@ -280,9 +280,9 @@ main {
 }
 
 /* The clip is the card's second target: it opens the clip large. It sits above
-   the stretched link, and says so three ways: the zoom-in cursor, an expand
-   cue in its corner, and the card's link arrow giving way while the pointer is
-   on it. */
+   the stretched link, and says so with an expand cue in its corner, while the
+   card's link arrow gives way as the pointer moves onto it. The cursor stays
+   the same pointer as the rest of the card: the cue does the job. */
 .clipbox {
   position: relative;
   z-index: 1;
@@ -293,7 +293,7 @@ main {
   border: 0;
   border-radius: 8px;
   background: none;
-  cursor: zoom-in;
+  cursor: pointer;
 }
 
 .clipbox:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
@@ -333,6 +333,7 @@ main {
 /* ---- viewer ---- */
 
 .viewer {
+  transform-origin: 0 0;
   padding: 0;
   border: 0;
   background: none;
