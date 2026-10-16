@@ -186,7 +186,11 @@ main {
   box-shadow: var(--card-lift);
 }
 
-.row:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+/* The card's link is the project name, stretched over the whole card, so the
+   card is still one big target. The focus ring goes on the card. */
+.cardlink { color: inherit; text-decoration: none; outline: none; }
+.cardlink::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
+.row:has(.cardlink:focus-visible) { outline: 2px solid var(--amber); outline-offset: 3px; }
 
 /* Mark, then a text column holding the name and tagline stacked; the blurb and
    tags run full-width beneath. The mark box is sized to the full two-line
@@ -270,11 +274,102 @@ main {
   width: 100%;
   aspect-ratio: 16 / 10;
   object-fit: cover;
-  margin: 2px 0 6px;
   border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--chip);
 }
+
+/* The clip is the card's second target: it opens the clip large. It sits above
+   the stretched link, and says so three ways: the zoom-in cursor, an expand
+   cue in its corner, and the card's link arrow giving way while the pointer is
+   on it. */
+.clipbox {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  margin: 2px 0 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: zoom-in;
+}
+
+.clipbox:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+
+.expand {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: rgba(11, 13, 18, .72);
+  border: 1px solid var(--line);
+  opacity: 0;
+  transition: opacity .2s;
+}
+
+.expand svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.row:hover .expand { opacity: .7; }
+.clipbox:hover .expand, .clipbox:focus-visible .expand { opacity: 1; }
+.row:has(.clipbox:hover) .arrow { opacity: 0; }
+
+/* No hover to reveal it on a touch screen, so the cue is always there. */
+@media (hover: none) { .expand { opacity: .85; } }
+
+/* ---- viewer ---- */
+
+.viewer {
+  padding: 0;
+  border: 0;
+  background: none;
+  overflow: visible;
+  max-width: none;
+  max-height: none;
+  width: min(1280px, 94vw, calc(86vh * 1.6));
+}
+
+.viewer::backdrop { background: rgba(5, 7, 12, .84); }
+
+.viewer video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 10px;
+  background: #000;
+  box-shadow: var(--card-lift);
+}
+
+.vclose {
+  position: absolute;
+  top: -40px;
+  right: -4px;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--soft);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.vclose:hover { color: var(--ink); }
+.vclose:focus-visible { outline: 2px solid var(--amber); }
 
 .blurb {
   margin: 9px 0 0;

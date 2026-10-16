@@ -25,13 +25,15 @@ second of the clip the poster was taken from. With a pointer the clip plays whil
 is hovered. On a touch screen with one card across it plays while the card is on screen;
 with two across it shows the poster. Every play starts from 0, and a stopped clip rewinds
 to `posterAt`, so it settles back on the same picture as the poster. Reduced motion shows
-the poster only. Encode at 960px wide, silent, with the index up front, and take the poster
-from a moment where the screen holds still:
+the poster only. Clicking the clip opens it large over the page, with controls, from where
+the preview was; the rest of the card still links to the repo. One file serves both, so
+encode it at the recording's full width, silent, with the index up front, and take the
+poster from a moment where the screen holds still:
 
 ```bash
-ffmpeg -i tour.mp4 -an -vf "scale=960:-2:flags=lanczos,format=yuv420p" \
+ffmpeg -i tour.mp4 -an -vf format=yuv420p \
   -c:v libx264 -crf 24 -preset slow -movflags +faststart img/thing.mp4
-ffmpeg -ss 3.2 -i img/thing.mp4 -frames:v 1 -q:v 3 img/thing.jpg   # posterAt: 3.2
+ffmpeg -ss 3.2 -i img/thing.mp4 -frames:v 1 -vf scale=960:-2 -q:v 3 img/thing.jpg   # posterAt: 3.2
 ```
 
 ## Marks

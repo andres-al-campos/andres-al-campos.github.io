@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alex Campos — tools that help you find your way</title>
 <meta name="description" content="Small tools I built because I kept wishing they existed: a web browsing time manager, a tree-based to-do list, and an apartment review analyzer.">
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=18">
 </head>
 <body>
 
@@ -50,10 +50,13 @@
     return n;
   }
 
+  // The card is a div, and its link is the project name, stretched over the
+  // whole card by CSS. A card with a demo clip has a second target, the clip,
+  // which sits above the stretched link: clicking it opens the clip large
+  // instead of following the link. A real link can't hold a button, so the
+  // card itself can't be the <a>.
   function card(p) {
-    var a = el('a', 'row');
-    a.href = p.repo;
-    a.rel = 'noopener';
+    var a = el('div', 'row');
 
     var head = el('div', 'rhead');
     var mark = el('div', 'mark');
@@ -62,7 +65,12 @@
     head.appendChild(mark);
 
     var htext = el('div', 'rhtext');
-    htext.appendChild(el('h2', null, p.name));
+    var h2 = el('h2');
+    var link = el('a', 'cardlink', p.name);
+    link.href = p.repo;
+    link.rel = 'noopener';
+    h2.appendChild(link);
+    htext.appendChild(h2);
     htext.appendChild(el('p', 'tagline', p.tagline));
     head.appendChild(htext);
 
@@ -104,6 +112,19 @@
     v.preload = 'none';   // nothing is fetched until the first play
     v.setAttribute('aria-hidden', 'true');
 
+    var box = el('button', 'clipbox');
+    box.type = 'button';
+    box.setAttribute('aria-label', 'Watch the ' + p.name + ' demo larger');
+    var cue = el('span', 'expand');
+    cue.innerHTML = EXPAND;
+    box.appendChild(v);
+    box.appendChild(cue);
+    box.addEventListener('click', function () {
+      var t = v.currentTime;
+      stop();
+      openViewer(p, t);
+    });
+
     function start() {
       if (!motionOK.matches) return;
       v.currentTime = 0;
@@ -125,7 +146,34 @@
         if (e.intersectionRatio >= .9 && oneAcross()) start(); else if (!v.paused) stop();
       }, { threshold: [0, .9] }).observe(v);
     }
-    return v;
+    return box;
+  }
+
+  var EXPAND = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/></svg>';
+
+  // One viewer for every card: the clip at full size, with controls. It picks
+  // up where the card's preview was, since the click means "this, bigger".
+  var viewer = el('dialog', 'viewer');
+  var big = el('video');
+  big.muted = true;
+  big.playsInline = true;
+  big.controls = true;
+  var shut = el('button', 'vclose', '\u00d7');
+  shut.type = 'button';
+  shut.setAttribute('aria-label', 'Close');
+  viewer.appendChild(big);
+  viewer.appendChild(shut);
+  document.body.appendChild(viewer);
+  shut.addEventListener('click', function () { viewer.close(); });
+  // A click on the backdrop lands on the dialog itself.
+  viewer.addEventListener('click', function (e) { if (e.target === viewer) viewer.close(); });
+  viewer.addEventListener('close', function () { big.pause(); big.removeAttribute('src'); big.load(); });
+
+  function openViewer(p, t) {
+    big.src = p.video;
+    big.addEventListener('loadedmetadata', function () { big.currentTime = t; }, { once: true });
+    viewer.showModal();
+    big.play().catch(function () {});
   }
 
   PROJECTS.forEach(function (p) { grid.appendChild(card(p)); });
