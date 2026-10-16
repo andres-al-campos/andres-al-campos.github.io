@@ -177,11 +177,12 @@ main {
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: var(--card);
-  transition: transform .2s, border-color .2s, box-shadow .2s;
+  transition: border-color .2s, box-shadow .2s;
 }
 
+/* Highlighted, not raised: a card that rises moves the clip's expand cue out
+   from under a pointer heading for it. */
 .row:hover {
-  transform: translateY(-2px);
   border-color: color-mix(in srgb, var(--amber) 38%, var(--line));
   box-shadow: var(--card-lift);
 }
