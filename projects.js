@@ -59,7 +59,7 @@ const PROJECTS = [
     name: "Vault",
     tagline: "Archive a YouTube channel and watch it offline.",
     blurb:
-      "A macOS app that downloads a whole channel, or subscribes to one and picks up its new videos each time it opens. Everything plays in a built-in player, and each video you open gets its own tab that picks up where you stopped.",
+      "A macOS app that downloads a whole channel, or subscribes to one and auto-downloads its new videos. Everything plays in a built-in player, and each video you open gets its own tab that picks up where you stopped.",
     tags: ["Rust", "Tauri", "JavaScript", "macOS", "yt-dlp"],
     repo: "https://github.com/andres-al-campos/Vault",
     video: "img/vault.mp4",
