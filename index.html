@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alex Campos — tools that help you find your way</title>
 <meta name="description" content="Small tools I built because I kept wishing they existed: a web browsing time manager, a tree-based to-do list, and an apartment review analyzer.">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=17">
 </head>
 <body>
 
@@ -37,8 +37,8 @@
 
 
 <script src="water.js?v=11"></script>
-<script src="marks.js?v=15"></script>
-<script src="projects.js?v=12"></script>
+<script src="marks.js?v=16"></script>
+<script src="projects.js?v=13"></script>
 <script>
 (function () {
   var grid = document.getElementById('grid');
@@ -69,6 +69,8 @@
     head.appendChild(el('span', 'arrow', '\u2197'));
     a.appendChild(head);
 
+    if (p.video) a.appendChild(clip(a, p));
+
     a.appendChild(el('p', 'blurb', p.blurb));
 
     var tags = el('ul', 'tags');
@@ -76,6 +78,34 @@
     a.appendChild(tags);
 
     return a;
+  }
+
+  // A demo clip plays only while the pointer is on its card, never on its own:
+  // a grid of autoplaying cards pulls the eye off the one being read. Leaving
+  // rewinds to 0, and the poster is the clip's first frame, so the rewound clip
+  // looks exactly like the still it started as. Phones have no hover and keep
+  // the poster; so does reduced motion.
+  var canHover = matchMedia('(hover: hover) and (prefers-reduced-motion: no-preference)');
+
+  function clip(card, p) {
+    var v = el('video', 'clip');
+    v.src = p.video;
+    v.poster = p.poster;
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = 'none';   // nothing is fetched until the first hover
+    v.setAttribute('aria-hidden', 'true');
+    card.addEventListener('pointerenter', function () {
+      if (!canHover.matches) return;
+      v.currentTime = 0;
+      // Rejects with AbortError when the pointer leaves before playback starts.
+      v.play().catch(function () {});
+    });
+    card.addEventListener('pointerleave', function () {
+      v.pause();
+      v.currentTime = 0;
+    });
+    return v;
   }
 
   PROJECTS.forEach(function (p) { grid.appendChild(card(p)); });

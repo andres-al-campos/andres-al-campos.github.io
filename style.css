@@ -261,6 +261,21 @@ main {
   text-wrap: balance;
 }
 
+/* A demo clip sits between the header and the blurb, so the mark and name keep
+   the same place on every card in a row. The aspect ratio is fixed (the clips
+   are 16:10) so the box is its full size before anything has loaded, and
+   playing it changes nothing in the layout. */
+.clip {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  margin: 2px 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--chip);
+}
+
 .blurb {
   margin: 9px 0 0;
   font-size: 14.5px;
