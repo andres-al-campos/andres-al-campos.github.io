@@ -37,7 +37,7 @@
 
 
 <script src="water.js?v=11"></script>
-<script src="marks.js?v=17"></script>
+<script src="marks.js?v=18"></script>
 <script src="projects.js?v=14"></script>
 <script>
 (function () {
@@ -120,10 +120,16 @@
     box.appendChild(v);
     box.appendChild(cue);
     box.addEventListener('click', function () {
+      // A phone has no room for a larger view: hand the clip to the system's
+      // own full-screen player, which can turn to landscape.
+      if (!canHover.matches && fullscreen(v, large)) return;
+      large();
+    });
+    function large() {
       var t = v.currentTime, still = frame(v);
       stop();
       openViewer(p, t, still, v);
-    });
+    }
 
     function start() {
       if (!motionOK.matches) return;
@@ -147,6 +153,31 @@
       }, { threshold: [0, .9] }).observe(v);
     }
     return box;
+  }
+
+  // Plays the card's own clip full screen, with the system's controls, and puts
+  // it back as a preview when full screen ends. False when the browser can't;
+  // a refusal that comes later calls fallback instead.
+  function fullscreen(v, fallback) {
+    var go = v.webkitEnterFullscreen ? function () { v.webkitEnterFullscreen(); }   // iPhone
+           : v.requestFullscreen ? function () { return v.requestFullscreen(); }
+           : null;
+    if (!go) return false;
+    v.controls = true;
+    v.play().catch(function () {});
+    try {
+      var r = go();
+      if (r && r.catch) r.catch(function () { v.controls = false; fallback(); });
+    } catch (e) { v.controls = false; return false; }
+    function back() {
+      if (document.fullscreenElement === v) return;
+      v.controls = false;
+      v.removeEventListener('webkitendfullscreen', back);
+      document.removeEventListener('fullscreenchange', back);
+    }
+    v.addEventListener('webkitendfullscreen', back);
+    document.addEventListener('fullscreenchange', back);
+    return true;
   }
 
   var EXPAND = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9"/></svg>';
@@ -218,6 +249,7 @@
   seek.addEventListener('input', function () { big.currentTime = +seek.value; paint(); });
   var from = null;   // the card clip the viewer grew out of
   var EASE = 'cubic-bezier(.2, .7, .3, 1)';
+  var GROW = 500, SHRINK = 400;   // slow enough to follow; leaving is a little quicker
 
   // The transform that lays the viewer exactly over the card's clip. Both are
   // 16:10, so one scale fits.
@@ -232,10 +264,10 @@
 
   function grow() {
     if (!motionOK.matches) return;
-    animate(viewer, { transform: [overClip(), 'none'] }, { duration: 320, easing: EASE });
-    animate(viewer, { opacity: [0, 1] }, { duration: 320, easing: EASE, pseudoElement: '::backdrop' });
-    animate(shut, { opacity: [0, 0, 1] }, { duration: 320 });
-    animate(bar, { opacity: [0, 0, 1] }, { duration: 320 });
+    animate(viewer, { transform: [overClip(), 'none'] }, { duration: GROW, easing: EASE });
+    animate(viewer, { opacity: [0, 1] }, { duration: GROW, easing: EASE, pseudoElement: '::backdrop' });
+    animate(shut, { opacity: [0, 0, 1] }, { duration: GROW });
+    animate(bar, { opacity: [0, 0, 1] }, { duration: GROW });
   }
 
   function shrink() {
@@ -244,7 +276,7 @@
     big.pause();
     // Closing mid-grow: measure from the viewer's resting place, not mid-flight.
     viewer.getAnimations({ subtree: true }).forEach(function (x) { x.cancel(); });
-    var opts = { duration: 260, easing: EASE, fill: 'forwards' };
+    var opts = { duration: SHRINK, easing: EASE, fill: 'forwards' };
     var a = animate(viewer, { transform: ['none', overClip()] }, opts);
     animate(viewer, { opacity: [1, 0] }, Object.assign({ pseudoElement: '::backdrop' }, opts));
     animate(shut, { opacity: [1, 0] }, { duration: 120, fill: 'forwards' });

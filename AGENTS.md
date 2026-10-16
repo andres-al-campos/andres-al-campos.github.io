@@ -21,3 +21,8 @@ Look-and-feel calls that hold across the site, with the reason given at the time
 - 2026-10-16. The large view's controls sit under the picture. The browser's own
   darken the frame while they show (all of it in Safari) and cover the recorded app's
   player bar.
+- 2026-10-16. On a phone, tapping a clip hands it to the system's full-screen player.
+  The large view there was barely bigger than the card; full screen can turn to
+  landscape.
+- 2026-10-16. The large view grows in 0.5 s and shrinks in 0.4 s. The first 0.32 s felt
+  a tad quick.
