@@ -7,7 +7,9 @@
 //   blurb     required — 1–3 sentences, what it does and why
 //   tags      required — short, lowercase-ish; shown as chips
 //   repo      required — full URL
-//   image     optional — path under img/. Omit and the card renders text-only.
+//   image     optional — path under img/. Not rendered: the card leads with its mark.
+//   video     optional — a short muted MP4 under img/, played while the card is hovered
+//   poster    with video — the clip's first frame, so rewinding on leave doesn't jump
 
 const PROJECTS = [
   {
@@ -83,5 +85,15 @@ const PROJECTS = [
       "A macOS menu bar app that holds a set of brightness and contrast presets and moves between them through the day, easing each change in over a minute. Bright enough to work by at noon, dim enough to sit with at midnight, and you never touch the buttons on the monitor to get there.",
     tags: ["Swift", "macOS", "monitor control"],
     repo: "https://github.com/andres-al-campos/Sundial",
+  },
+  {
+    name: "Vault",
+    tagline: "Keep a YouTube channel and watch it offline.",
+    blurb:
+      "A macOS app that archives a YouTube channel and plays its videos in a built-in player, no connection needed. Download the whole channel or only its most popular videos, and run it again later to fetch just what's new. Every video you open gets a tab that keeps your place.",
+    tags: ["Rust", "Tauri", "JavaScript", "macOS", "yt-dlp"],
+    repo: "https://github.com/andres-al-campos/Vault",
+    video: "img/vault.mp4",
+    poster: "img/vault.jpg",
   },
 ];

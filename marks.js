@@ -1,4 +1,4 @@
-// The eleven project marks. One 32x32 viewBox, one 1.7px stroke, two tones.
+// The twelve project marks. One 32x32 viewBox, one 1.7px stroke, two tones.
 // Shared by the live site and the mockups — edit here, not in a copy.
 var MARKS = {
   WebTime: {
@@ -102,6 +102,13 @@ var MARKS = {
        + '<path class="s lit" style="stroke-width:2.8" d="M17 10 L17 22"/>'
        + '<path class="s" style="stroke-width:2.8;opacity:.45" d="M22 13 L22 19"/>'
        + '<path class="s" style="stroke-width:2.8;opacity:.45" d="M26 13.5 L26 18.5"/>'
+  },
+  Vault: {
+    d: 'A vault door with a play button for a dial',
+    svg: '<rect class="s dim" x="4" y="4.5" width="24" height="23" rx="3"/>'
+       + '<path class="s dim" d="M7 10 L7 13 M7 19 L7 22"/>'
+       + '<circle class="s" cx="17" cy="16" r="8"/>'
+       + '<path class="f lit" d="M15 12.6 L20.6 16 L15 19.4 Z"/>'
   },
   Almanac: {
     d: 'A calendar, one date lit',
