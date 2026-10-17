@@ -26,5 +26,12 @@ Look-and-feel calls that hold across the site, with the reason given at the time
 - 2026-10-16. On a phone, tapping a clip hands it to the system's full-screen player.
   The large view there was barely bigger than the card; full screen can turn to
   landscape.
+- 2026-10-16. A demo clip shows the app as it looks in normal use: WebTime was
+  recorded in a real browser window at 100% zoom, with its popup opening from the
+  toolbar. The camera may zoom in to make something readable, but nothing is drawn
+  larger than it is; a timer enlarged to match a zoomed page made the nudge look
+  enormous. Fake sites and data stand in for the user's own browsing.
+- 2026-10-16. A sped-up stretch carries a "15×" badge at the bottom right, left of
+  where the card's expand icon sits so the icon doesn't cover it.
 - 2026-10-16. The large view grows in 0.5 s and shrinks in 0.35 s. The first 0.32 s felt
   a tad quick; the user set the shrink a little quicker than the grow.
