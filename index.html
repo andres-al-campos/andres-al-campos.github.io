@@ -240,19 +240,43 @@
     t = Math.max(0, Math.floor(t || 0));
     return Math.floor(t / 60) + ':' + ('0' + t % 60).slice(-2);
   }
+  // While the playhead is dragged, the position shown is where it's going.
+  var scrub = null;   // { to, wasPlaying } during a drag
   function paint() {
-    toggle.innerHTML = big.paused ? PLAY : PAUSE;
+    var at = scrub ? scrub.to : big.currentTime;
+    toggle.innerHTML = big.paused && !(scrub && scrub.wasPlaying) ? PLAY : PAUSE;
     toggle.setAttribute('aria-label', big.paused ? 'Play' : 'Pause');
     if (big.duration) seek.max = big.duration;
-    seek.value = big.currentTime;
-    seek.style.setProperty('--at', (big.duration ? big.currentTime / big.duration * 100 : 0) + '%');
-    clock.textContent = mmss(big.currentTime) + ' / ' + mmss(big.duration);
+    seek.value = at;
+    seek.style.setProperty('--at', (big.duration ? at / big.duration * 100 : 0) + '%');
+    clock.textContent = mmss(at) + ' / ' + mmss(big.duration);
   }
   function playPause() { if (big.paused) big.play().catch(function () {}); else big.pause(); }
   ['play', 'pause', 'timeupdate', 'loadedmetadata', 'seeked'].forEach(function (e) { big.addEventListener(e, paint); });
   toggle.addEventListener('click', playPause);
   big.addEventListener('click', playPause);
-  seek.addEventListener('input', function () { big.currentTime = +seek.value; paint(); });
+  // A drag sends a seek per pointer move, the same 0 over and over past the
+  // bar's start. Seeking that often while playing froze Safari's picture with
+  // the clock still running, so a drag pauses, and runs one seek at a time
+  // with the latest position.
+  function seekTo(t) { if (!big.seeking && big.currentTime !== t) big.currentTime = t; }
+  big.addEventListener('seeked', function () { if (scrub) seekTo(scrub.to); });
+  seek.addEventListener('input', function () {
+    if (!scrub) { scrub = { wasPlaying: !big.paused }; big.pause(); }
+    scrub.to = +seek.value;
+    seekTo(scrub.to);
+    paint();
+  });
+  // Fires on release, wherever the pointer is let go.
+  seek.addEventListener('change', function () {
+    if (!scrub) return;
+    var s = scrub;
+    scrub = null;
+    if (big.seeking) big.addEventListener('seeked', function () { seekTo(s.to); }, { once: true });
+    else seekTo(s.to);
+    if (s.wasPlaying) big.play().catch(function () {});
+    paint();
+  });
   var from = null;   // the card clip the viewer grew out of
   var EASE = 'cubic-bezier(.2, .7, .3, 1)';
   var GROW = 500, SHRINK = 350;   // slow enough to follow; leaving is a little quicker
@@ -268,9 +292,12 @@
     try { return el.animate(frames, opts); } catch (e) { return null; }
   }
 
+  // The clip holds still while it grows and plays once it lands.
   function grow() {
-    if (!motionOK.matches) return;
-    animate(viewer, { transform: [overClip(), 'none'] }, { duration: GROW, easing: EASE });
+    var play = function () { if (viewer.open) big.play().catch(function () {}); };
+    if (!motionOK.matches) { play(); return; }
+    var a = animate(viewer, { transform: [overClip(), 'none'] }, { duration: GROW, easing: EASE });
+    if (a) a.onfinish = play; else play();
     animate(viewer, { opacity: [0, 1] }, { duration: GROW, easing: EASE, pseudoElement: '::backdrop' });
     animate(shut, { opacity: [0, 0, 1] }, { duration: GROW });
     animate(bar, { opacity: [0, 0, 1] }, { duration: GROW });
@@ -289,8 +316,14 @@
     animate(bar, { opacity: [1, 0] }, { duration: 120, fill: 'forwards' });
     if (!a) { viewer.close(); return; }
     a.onfinish = function () {
+      var t = big.currentTime;
       viewer.close();
       viewer.getAnimations({ subtree: true }).forEach(function (x) { x.cancel(); });
+      // Landing back on a card still under the pointer, its clip carries on.
+      if (canHover.matches && from.closest('.row').matches(':hover')) {
+        from.currentTime = t;
+        from.play().catch(function () {});
+      }
     };
   }
 
@@ -313,7 +346,6 @@
     paint();
     viewer.showModal();
     grow();
-    big.play().catch(function () {});
   }
 
   PROJECTS.forEach(function (p) { grid.appendChild(card(p)); });
