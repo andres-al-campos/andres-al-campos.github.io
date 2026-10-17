@@ -50,3 +50,6 @@ Look-and-feel calls that hold across the site, with the reason given at the time
   a scripted agent prompt with the tree it builds set in advance. These are obviously
   limits of recording, and they don't take away from how the app feels. The line is
   showing something the app can't do.
+- 2026-10-17. A fake site in a clip is dark too, like the apps and this site, though not
+  pitch black, and has the parts a real one has around its content (nav, sidebars). A
+  light, bare TweetBook stood out in WebTime's clip.
