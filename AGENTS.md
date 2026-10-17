@@ -11,7 +11,9 @@ Look-and-feel calls that hold across the site, with the reason given at the time
   hover with a pointer, and on a phone while it is the card on screen. A grid where every
   card autoplays pulls attention off the card being read; with one card across, the card
   in view is the one being read. Tablets with two across keep the poster. (2026-10-17: the
-  user narrowed hover to the clip itself rather than the whole card.)
+  pointer has to be on the clip, not just the card. A moving picture makes the card's text
+  hard to read, and people hover a card to read it; they hover the clip to find out it's a
+  video, then likely expand it, watch, and move on.)
 - 2026-10-15. The poster is a frame with something happening in it, not the clip's first
   frame. Vault's first frame was its empty "Add a channel" screen, and the user found the
   channel page "way better" even though the card cuts to the empty screen when the clip
