@@ -249,7 +249,7 @@
   seek.addEventListener('input', function () { big.currentTime = +seek.value; paint(); });
   var from = null;   // the card clip the viewer grew out of
   var EASE = 'cubic-bezier(.2, .7, .3, 1)';
-  var GROW = 500, SHRINK = 400;   // slow enough to follow; leaving is a little quicker
+  var GROW = 500, SHRINK = 350;   // slow enough to follow; leaving is a little quicker
 
   // The transform that lays the viewer exactly over the card's clip. Both are
   // 16:10, so one scale fits.
