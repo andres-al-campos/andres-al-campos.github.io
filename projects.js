@@ -34,7 +34,7 @@ const PROJECTS = [
     repo: "https://github.com/andres-al-campos/Ansa",
     video: "img/ansa.mp4",
     poster: "img/ansa.jpg",
-    posterAt: 23.0,
+    posterAt: 23.6,
   },
   {
     name: "Momus",
