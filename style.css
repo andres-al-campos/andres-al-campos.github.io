@@ -296,13 +296,13 @@ main {
 
 .expand {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
-  width: 28px;
-  height: 28px;
+  right: 10px;
+  bottom: 10px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
-  border-radius: 7px;
+  border-radius: 9px;
   background: rgba(11, 13, 18, .72);
   border: 1px solid var(--line);
   opacity: 0;
@@ -310,11 +310,11 @@ main {
 }
 
 .expand svg {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: var(--ink);
-  stroke-width: 1.6;
+  stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -323,7 +323,7 @@ main {
 .clipbox:hover .expand, .clipbox:focus-visible .expand { opacity: 1; }
 
 /* No hover to reveal it on a touch screen, so the cue is always there. */
-@media (hover: none) { .expand { opacity: .85; } }
+@media (hover: none) { .expand { opacity: .9; } }
 
 /* ---- viewer ---- */
 
