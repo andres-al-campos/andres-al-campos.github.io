@@ -32,6 +32,9 @@ const PROJECTS = [
       "A to-do list where every task is a tree. Break a task into subtasks, then those into smaller ones, and progress rolls up from the leaves, so each branch shows how far along it is. It runs on the web, iOS, and desktop against the same tree, and an MCP server lets an AI agent read and edit it too.",
     tags: ["TypeScript", "React", "Swift", "Electron", "SQLite", "MCP"],
     repo: "https://github.com/andres-al-campos/Ansa",
+    video: "img/ansa.mp4",
+    poster: "img/ansa.jpg",
+    posterAt: 23.0,
   },
   {
     name: "Momus",
