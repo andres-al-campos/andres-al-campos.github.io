@@ -122,7 +122,7 @@
     box.addEventListener('click', function () {
       // A phone has no room for a larger view: hand the clip to the system's
       // own full-screen player, which can turn to landscape.
-      if (!canHover.matches && fullscreen(v, large)) return;
+      if (!canHover.matches && fullscreen(v, large, resume)) return;
       large();
     });
     function large() {
@@ -143,22 +143,29 @@
       v.currentTime = p.posterAt || 0;
     }
 
+    // Back from full screen the clip has stopped wherever it was left, often on
+    // its last frame: play it again if it's still the card in view, else rest it
+    // on the poster's frame.
+    var inView = false;
+    function resume() { if (inView && oneAcross()) start(); else stop(); }
+
     if (canHover.matches) {
       card.addEventListener('pointerenter', start);
       card.addEventListener('pointerleave', stop);
     } else {
       new IntersectionObserver(function (entries) {
         var e = entries[entries.length - 1];
-        if (e.intersectionRatio >= .9 && oneAcross()) start(); else if (!v.paused) stop();
+        inView = e.intersectionRatio >= .9;
+        if (inView && oneAcross()) start(); else if (!v.paused) stop();
       }, { threshold: [0, .9] }).observe(v);
     }
     return box;
   }
 
   // Plays the card's own clip full screen, with the system's controls, and puts
-  // it back as a preview when full screen ends. False when the browser can't;
-  // a refusal that comes later calls fallback instead.
-  function fullscreen(v, fallback) {
+  // it back as a preview when full screen ends, calling done. False when the
+  // browser can't; a refusal that comes later calls fallback instead.
+  function fullscreen(v, fallback, done) {
     var go = v.webkitEnterFullscreen ? function () { v.webkitEnterFullscreen(); }   // iPhone
            : v.requestFullscreen ? function () { return v.requestFullscreen(); }
            : null;
@@ -174,6 +181,7 @@
       v.controls = false;
       v.removeEventListener('webkitendfullscreen', back);
       document.removeEventListener('fullscreenchange', back);
+      done();
     }
     v.addEventListener('webkitendfullscreen', back);
     document.addEventListener('fullscreenchange', back);
