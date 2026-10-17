@@ -35,3 +35,8 @@ Look-and-feel calls that hold across the site, with the reason given at the time
   where the card's expand icon sits so the icon doesn't cover it.
 - 2026-10-16. The large view grows in 0.5 s and shrinks in 0.35 s. The first 0.32 s felt
   a tad quick; the user set the shrink a little quicker than the grow.
+- 2026-10-17. A clip's camera moves continuously, zooming in and out between the things
+  being shown. Waits are cut only where the screen is still, so the cuts don't show. Ansa's
+  first cut gave each piece its own framing, and every time cut became a camera jump.
+- 2026-10-17. A clip showing two apps shows them in the same appearance (Ansa's desktop
+  and phone are both dark), so they read as one product.
