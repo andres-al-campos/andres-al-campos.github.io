@@ -88,7 +88,7 @@
 
   // A demo clip plays only while it has the reader's attention, never on its
   // own: a grid of autoplaying cards pulls the eye off the one being read. With
-  // a pointer that means while the card is hovered. On a touch screen with one
+  // a pointer that means while the clip itself is hovered. On a touch screen with one
   // card across, the card in view is the one being read, so its clip plays
   // while it is on screen; with two across it keeps the poster. Each play
   // starts from 0. Stopping rewinds to the moment the poster was taken from,
@@ -148,8 +148,8 @@
     function resume() { if (inView && oneAcross()) start(); else stop(); }
 
     if (canHover.matches) {
-      card.addEventListener('pointerenter', start);
-      card.addEventListener('pointerleave', stop);
+      box.addEventListener('pointerenter', start);
+      box.addEventListener('pointerleave', stop);
     } else {
       new IntersectionObserver(function (entries) {
         var e = entries[entries.length - 1];
@@ -319,8 +319,8 @@
       var t = big.currentTime;
       viewer.close();
       viewer.getAnimations({ subtree: true }).forEach(function (x) { x.cancel(); });
-      // Landing back on a card still under the pointer, its clip carries on.
-      if (canHover.matches && from.closest('.row').matches(':hover')) {
+      // Landing back on a clip still under the pointer, it carries on.
+      if (canHover.matches && from.parentElement.matches(':hover')) {
         from.currentTime = t;
         from.play().catch(function () {});
       }
