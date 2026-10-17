@@ -1,5 +1,8 @@
 # Portfolio
 
+A portfolio where someone deciding whether to work with Alex can see what each tool does
+in a few seconds, and go to the code.
+
 ## Principles
 
 Look-and-feel calls that hold across the site, with the reason given at the time.
@@ -40,3 +43,10 @@ Look-and-feel calls that hold across the site, with the reason given at the time
   first cut gave each piece its own framing, and every time cut became a camera jump.
 - 2026-10-17. A clip showing two apps shows them in the same appearance (Ansa's desktop
   and phone are both dark), so they read as one product.
+- 2026-10-17. A clip hides details that aren't part of using the app, however small: the
+  user's name and session titles in a window title, a promo line in a terminal, a Dock
+  tooltip.
+- 2026-10-17. A clip may stage what it shows: a drawn pointer, touch dots, typed input,
+  a scripted agent prompt with the tree it builds set in advance. These are obviously
+  limits of recording, and they don't take away from how the app feels. The line is
+  showing something the app can't do.
