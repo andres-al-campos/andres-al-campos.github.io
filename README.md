@@ -27,7 +27,8 @@ with two across it shows the poster. Every play starts from 0, and a stopped cli
 to `posterAt`, so it settles back on the same picture as the poster. Reduced motion shows
 the poster only. Clicking the clip opens it large over the page, with controls, from where
 the preview was; on a phone, tapping it opens the system's full-screen player instead. The
-rest of the card still links to the repo. One file serves both, so
+card's name and its "GitHub ↗" link go to the repo. One file serves the preview
+and the large view, so
 encode it at the recording's full width, silent, with the index up front, and take the
 poster from a moment where the screen holds still:
 
@@ -51,5 +52,5 @@ python3 -m http.server 8000
 ```
 
 Then open <http://localhost:8000>. Check both color schemes. Python's server doesn't answer
-range requests, so the clips play but can't seek; GitHub Pages does. The layout is a single
-column of full-width cards; below 620px the padding tightens and the hover arrow drops.
+range requests, so the clips play but can't seek; GitHub Pages does. The cards sit in a grid,
+one across on a phone; below 620px the padding tightens.

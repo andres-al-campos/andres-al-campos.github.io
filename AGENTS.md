@@ -12,10 +12,11 @@ Look-and-feel calls that hold across the site, with the reason given at the time
   frame. Vault's first frame was its empty "Add a channel" screen, and the user found the
   channel page "way better" even though the card cuts to the empty screen when the clip
   starts. A stopped clip rewinds to the poster's frame, so stopping doesn't jump.
-- 2026-10-16. A card with a clip has two targets: the clip opens it large, the rest of
-  the card links to the repo. The expand icon in the clip's corner says so, and the
-  card's link arrow gives way while the pointer is on the clip. The cursor stays the
-  same pointer; the user found the icon does the job.
+- 2026-10-16. A card isn't a link. The name and a "GitHub ↗" in the corner go to the
+  repo, and a clip opens large, with an expand icon in its corner saying so. A
+  whole-card link left the clip competing with it, and on a phone a tap meant to stop
+  scrolling could open GitHub. The cursor stays the plain pointer over the clip; the
+  user found the icon does the job.
 - 2026-10-16. Cards highlight on hover but don't rise. A rising card made it feel like
   the pointer would miss the expand icon.
 - 2026-10-16. The large view's controls sit under the picture. The browser's own

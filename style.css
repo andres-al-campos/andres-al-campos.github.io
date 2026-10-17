@@ -160,9 +160,8 @@ main {
 
 /* ---- rows ---- */
 
-/* Each project is a card, not a text row — the border is the affordance that
-   says "clickable" before anyone reads a word, and it's the only one that
-   survives on touch, where there is no hover. */
+/* Each project is a card, not a text row. The card isn't a link itself: its
+   name, its GitHub link and its clip are the targets. */
 .row {
   /* Column, not block: the grid stretches every card to the tallest in its row,
      and the tag list is pushed to the bottom so the chips line up across the
@@ -181,17 +180,17 @@ main {
 }
 
 /* Highlighted, not raised: a card that rises moves the clip's expand cue out
-   from under a pointer heading for it. */
+   from under a pointer heading for it. The highlight marks the card being
+   read; the links carry their own hover. */
 .row:hover {
   border-color: color-mix(in srgb, var(--amber) 38%, var(--line));
   box-shadow: var(--card-lift);
 }
 
-/* The card's link is the project name, stretched over the whole card, so the
-   card is still one big target. The focus ring goes on the card. */
-.cardlink { color: inherit; text-decoration: none; outline: none; }
-.cardlink::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
-.row:has(.cardlink:focus-visible) { outline: 2px solid var(--amber); outline-offset: 3px; }
+/* The name links to the repo, like the GitHub link beside it. */
+.namelink { color: inherit; text-decoration: none; border-radius: 3px; }
+.namelink:hover { color: color-mix(in srgb, var(--amber) 80%, white); text-decoration: underline; text-underline-offset: 3px; }
+.namelink:focus-visible, .repolink:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
 
 /* Mark, then a text column holding the name and tagline stacked; the blurb and
    tags run full-width beneath. The mark box is sized to the full two-line
@@ -241,18 +240,20 @@ main {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-.row:hover h2 { color: color-mix(in srgb, var(--amber) 80%, white); }
-
-.row .arrow {
+/* Always shown, phones included: it's the card's way to the repo, not a hover
+   hint. */
+.repolink {
   margin-left: auto;
-  font-size: 14px;
+  flex: none;
+  padding: 2px 0;
+  font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace;
   color: var(--faint);
-  opacity: 0;
-  transform: translateX(-6px);
-  transition: opacity .25s, transform .25s, color .25s;
+  text-decoration: none;
+  border-radius: 3px;
+  transition: color .2s;
 }
 
-.row:hover .arrow { opacity: 1; transform: translateX(0); color: var(--amber); }
+.repolink:hover { color: var(--amber); }
 
 /* The line people actually read — sits under the mono name label as the second
    row of the header, same size but carried in ink rather than the faint label. */
@@ -280,13 +281,10 @@ main {
   background: var(--chip);
 }
 
-/* The clip is the card's second target: it opens the clip large. It sits above
-   the stretched link, and says so with an expand cue in its corner, while the
-   card's link arrow gives way as the pointer moves onto it. The cursor stays
-   the same pointer as the rest of the card: the cue does the job. */
+/* The clip opens large, and says so with an expand cue in its corner. The
+   cursor stays the plain pointer: the cue does the job. */
 .clipbox {
   position: relative;
-  z-index: 1;
   display: block;
   width: 100%;
   margin: 2px 0 6px;
@@ -326,7 +324,6 @@ main {
 
 .row:hover .expand { opacity: .7; }
 .clipbox:hover .expand, .clipbox:focus-visible .expand { opacity: 1; }
-.row:has(.clipbox:hover) .arrow { opacity: 0; }
 
 /* No hover to reveal it on a touch screen, so the cue is always there. */
 @media (hover: none) { .expand { opacity: .85; } }
@@ -487,7 +484,6 @@ main {
   .row { padding: 16px 16px 18px; }
   .rhead { gap: 12px; margin-bottom: 12px; }
   .mark { width: 48px; height: 48px; }
-  .row .arrow { display: none; }
 }
 
 /* ---- hero water ----

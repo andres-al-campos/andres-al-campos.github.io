@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alex Campos — tools that help you find your way</title>
 <meta name="description" content="Small tools I built because I kept wishing they existed: a web browsing time manager, a tree-based to-do list, and an apartment review analyzer.">
-<link rel="stylesheet" href="style.css?v=21">
+<link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
 
@@ -50,11 +50,10 @@
     return n;
   }
 
-  // The card is a div, and its link is the project name, stretched over the
-  // whole card by CSS. A card with a demo clip has a second target, the clip,
-  // which sits above the stretched link: clicking it opens the clip large
-  // instead of following the link. A real link can't hold a button, so the
-  // card itself can't be the <a>.
+  // The card itself isn't a link. Its targets say what they do: the name and
+  // the GitHub link in the corner go to the repo, and a demo clip opens large.
+  // A whole-card link left the clip competing with it, and on a phone a tap to
+  // stop scrolling could open GitHub.
   function card(p) {
     var a = el('div', 'row');
 
@@ -66,7 +65,7 @@
 
     var htext = el('div', 'rhtext');
     var h2 = el('h2');
-    var link = el('a', 'cardlink', p.name);
+    var link = el('a', 'namelink', p.name);
     link.href = p.repo;
     link.rel = 'noopener';
     h2.appendChild(link);
@@ -74,7 +73,10 @@
     htext.appendChild(el('p', 'tagline', p.tagline));
     head.appendChild(htext);
 
-    head.appendChild(el('span', 'arrow', '\u2197'));
+    var repo = el('a', 'repolink', 'GitHub \u2197');
+    repo.href = p.repo;
+    repo.rel = 'noopener';
+    head.appendChild(repo);
     a.appendChild(head);
 
     if (p.video) a.appendChild(clip(a, p));
