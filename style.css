@@ -161,7 +161,7 @@ main {
 /* ---- rows ---- */
 
 /* Each project is a card, not a text row. The card isn't a link itself: its
-   name, its GitHub link and its clip are the targets. */
+   name and its clip are the targets. */
 .row {
   /* Column, not block: the grid stretches every card to the tallest in its row,
      and the tag list is pushed to the bottom so the chips line up across the
@@ -181,16 +181,27 @@ main {
 
 /* Highlighted, not raised: a card that rises moves the clip's expand cue out
    from under a pointer heading for it. The highlight marks the card being
-   read; the links carry their own hover. */
+   read, and underlines the name to show where the link is. */
 .row:hover {
   border-color: color-mix(in srgb, var(--amber) 38%, var(--line));
   box-shadow: var(--card-lift);
 }
 
-/* The name links to the repo, like the GitHub link beside it. */
-.namelink { color: inherit; text-decoration: none; border-radius: 3px; }
-.namelink:hover { color: color-mix(in srgb, var(--amber) 80%, white); text-decoration: underline; text-underline-offset: 3px; }
-.namelink:focus-visible, .repolink:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+/* The name links to the repo. With a pointer its underline appears while the
+   card is hovered; on touch, with no hover to reveal it, it's always there. */
+.namelink {
+  color: inherit;
+  border-radius: 3px;
+  text-decoration: underline transparent;
+  text-underline-offset: 3px;
+  transition: text-decoration-color .2s, color .2s;
+}
+.row:hover .namelink { text-decoration-color: currentColor; }
+.namelink:hover { color: color-mix(in srgb, var(--amber) 80%, white); }
+.namelink:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+@media (hover: none) {
+  .namelink { text-decoration-color: currentColor; }
+}
 
 /* Mark, then a text column holding the name and tagline stacked; the blurb and
    tags run full-width beneath. The mark box is sized to the full two-line
@@ -240,20 +251,6 @@ main {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-/* Always shown, phones included: it's the card's way to the repo, not a hover
-   hint. */
-.repolink {
-  margin-left: auto;
-  flex: none;
-  padding: 2px 0;
-  font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--faint);
-  text-decoration: none;
-  border-radius: 3px;
-  transition: color .2s;
-}
-
-.repolink:hover { color: var(--amber); }
 
 /* The line people actually read — sits under the mono name label as the second
    row of the header, same size but carried in ink rather than the faint label. */

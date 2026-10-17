@@ -27,7 +27,7 @@ with two across it shows the poster. Every play starts from 0, and a stopped cli
 to `posterAt`, so it settles back on the same picture as the poster. Reduced motion shows
 the poster only. Clicking the clip opens it large over the page, with controls, from where
 the preview was; on a phone, tapping it opens the system's full-screen player instead. The
-card's name and its "GitHub ↗" link go to the repo. One file serves the preview
+card's name links to the repo, underlined while the card is hovered and always on a phone. One file serves the preview
 and the large view, so
 encode it at the recording's full width, silent, with the index up front, and take the
 poster from a moment where the screen holds still:
