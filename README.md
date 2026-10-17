@@ -21,16 +21,16 @@ array.
 ## Demo clips
 
 A card can also carry a short demo: `video` and `poster` under `img/`, and `posterAt`, the
-second of the clip the poster was taken from. With a pointer the clip plays while the card
-is hovered. On a touch screen with one card across it plays while the card is on screen;
-with two across it shows the poster. Every play starts from 0, and a stopped clip rewinds
-to `posterAt`, so it settles back on the same picture as the poster. Reduced motion shows
-the poster only. Clicking the clip opens it large over the page, with controls, from where
-the preview was; on a phone, tapping it opens the system's full-screen player instead. The
-card's name links to the repo, underlined while the card is hovered and always on a phone. One file serves the preview
-and the large view, so
-encode it at the recording's full width, silent, with the index up front, and take the
-poster from a moment where the screen holds still:
+second of the clip the poster was taken from. With a pointer the clip plays while the
+pointer is on it. On a touch screen with one card across it plays while the card is on
+screen; with two across it shows the poster. Every play starts from 0, and a stopped clip
+rewinds to `posterAt`, so it settles back on the same picture as the poster. Reduced motion
+shows the poster only. Clicking the clip opens it large over the page, with controls, from
+where the preview was; on a phone, tapping it opens the system's full-screen player
+instead. The card's name links to the repo, underlined while the card is hovered and always
+on a phone. One file serves the preview and the large view, so encode it at the
+recording's full width, silent, with the index up front, and take the poster from a moment
+where the screen holds still:
 
 ```bash
 ffmpeg -i tour.mp4 -an -vf format=yuv420p \
