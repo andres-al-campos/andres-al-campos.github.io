@@ -53,3 +53,6 @@ Look-and-feel calls that hold across the site, with the reason given at the time
 - 2026-10-17. A fake site in a clip is dark too, like the apps and this site, though not
   pitch black, and has the parts a real one has around its content (nav, sidebars). A
   light, bare TweetBook stood out in WebTime's clip.
+- 2026-10-17. The large view's clip holds still while it grows and shrinks, and plays once
+  it lands. A card still under the pointer when the view shrinks back plays on from where
+  the large view stopped.
