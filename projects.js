@@ -21,6 +21,9 @@ const PROJECTS = [
     tags: ["TypeScript", "browser extension"],
     repo: "https://github.com/andres-al-campos/WebTime",
     image: "img/webtime.png",
+    video: "img/webtime.mp4",
+    poster: "img/webtime.jpg",
+    posterAt: 7.0,
   },
   {
     name: "Ansa",
