@@ -87,6 +87,9 @@ const PROJECTS = [
       "Give it cat and lion and it finds the words sitting close to both, then shows the path it walked to get there: lion, leopard, cats. It runs two searches at once, a quick overlap of each word's nearest neighbors and a deeper walk through a graph of word embeddings, then ranks every candidate by its strongest link.",
     tags: ["Python", "local server", "CLI", "embeddings", "graph search"],
     repo: "https://github.com/andres-al-campos/Etymon",
+    video: "img/etymon.mp4",
+    poster: "img/etymon.jpg",
+    posterAt: 12.7,
   },
   {
     name: "ReSign",
