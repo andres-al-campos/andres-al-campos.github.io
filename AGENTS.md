@@ -59,3 +59,6 @@ Look-and-feel calls that hold across the site, with the reason given at the time
 - 2026-10-17. The large view's clip holds still while it grows and shrinks, and plays once
   it lands. A card still under the pointer when the view shrinks back plays on from where
   the large view stopped.
+- 2026-10-20. An explanation stays only as long as it's needed. Winnow's clip says
+  "sample data" in its opening scene and then drops it: after that it's obvious every
+  company is made up.
