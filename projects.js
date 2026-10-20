@@ -52,6 +52,9 @@ const PROJECTS = [
       "Almost every company above 4.0 has had a review push behind it, so the average alone proves nothing. Winnow scores many companies on whether their reviews look organic: the shape of the ratings, how former employees compare to current ones, whether the sub-ratings agree, and how the score has moved over time.",
     tags: ["Python", "CLI", "SQLite", "sentiment analysis", "scraping"],
     repo: "https://github.com/andres-al-campos/Winnow",
+    video: "img/winnow.mp4",
+    poster: "img/winnow.jpg",
+    posterAt: 10.6,
   },
   {
     name: "Chronicle",
