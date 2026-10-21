@@ -49,6 +49,12 @@ No check yet. Each clip is judged by watching it.
 - 2026-10-20. Winnow's clip runs 30 s, and the app's local address (`127.0.0.1:8766`)
   shows in its address bar; the user found both fine. A tool with more to show can run
   longer.
+- 2026-10-21. A clip shows off every feature it reaches: scrolling through results, it
+  stops briefly on each section. "What's the point of making a video if you're not going
+  to show off all the features?" Momus's first cut ran past its results to the bottom.
+- 2026-10-21. While a tool works on the page in the background, the camera widens to the
+  whole window so the work shows (Momus's scrape, with Google's review list scrolling by),
+  then closes in on the tool when its results land.
 
 ## Gotchas
 
@@ -57,3 +63,7 @@ No check yet. Each clip is judged by watching it.
 - A scroll wheel scrolls whatever is under the pointer: glide to the column that should
   scroll first.
 - Time cuts come out of the raw take before the camera is applied, or they show as jumps.
+- Slowing a 30 fps take in the edit repeats frames and judders; interpolating them
+  (minterpolate) smears scrolling text. Re-record at the pace the clip needs.
+- Chromium's download bubble re-shows recent downloads over a toolbar popup. Erase the
+  download history (`chrome.downloads.erase({})`) before the take.
