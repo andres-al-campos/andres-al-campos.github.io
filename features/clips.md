@@ -43,6 +43,9 @@ No check yet. Each clip is judged by watching it.
 - 2026-10-20. Winnow's clip says "sample data" in its opening scene and then drops it:
   after that it's obvious every company is made up.
 - 2026-10-20. A pause runs 2–2.5 s at most; longer ones felt too dramatic.
+- 2026-10-20. Winnow's clip runs 30 s, and the app's local address (`127.0.0.1:8766`)
+  shows in its address bar; the user found both fine. A tool with more to show can run
+  longer.
 
 ## Gotchas
 
