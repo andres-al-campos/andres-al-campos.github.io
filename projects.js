@@ -44,6 +44,9 @@ const PROJECTS = [
     tags: ["JavaScript", "browser extension", "distribution analysis"],
     repo: "https://github.com/andres-al-campos/Momus",
     image: "img/momus.png",
+    video: "img/momus.mp4",
+    poster: "img/momus.jpg",
+    posterAt: 11.5,
   },
   {
     name: "Winnow",
