@@ -40,6 +40,9 @@ No check yet. Each clip is judged by watching it.
 - 2026-10-17. A fake site in a clip is dark too, like the apps and this site, though not
   pitch black, and has the parts a real one has around its content (nav, sidebars). A
   light, bare TweetBook stood out in WebTime's clip.
+- 2026-10-20. A clip may use a real, well-known public place: Momus runs on Google Maps
+  reviews, and for a popular place those aren't private (the user's call). Fake data
+  stays the default where the data would be the user's own.
 - 2026-10-20. Winnow's clip says "sample data" in its opening scene and then drops it:
   after that it's obvious every company is made up.
 - 2026-10-20. A pause runs 2–2.5 s at most; longer ones felt too dramatic.
