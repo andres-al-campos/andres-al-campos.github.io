@@ -7,7 +7,7 @@ gitignored.
 
 ## Sub-features
 
-- A clip shows a tool's main use in about 30 seconds, muted, with a drawn pointer.
+- A clip shows a tool's main use in 20 to 30 seconds, muted, with a drawn pointer.
 - Sped-up stretches carry a speed badge.
 
 ## How to get to it

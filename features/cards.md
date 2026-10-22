@@ -19,8 +19,8 @@ Open the site.
 
 ## Driving it
 
-No check yet: the repo has no `build.sh` or drive scenarios. Checked by eye in a
-browser and on a phone.
+No check yet: there are no drive scenarios. Checked by eye in a browser and on a
+phone.
 
 ## Calls
 
