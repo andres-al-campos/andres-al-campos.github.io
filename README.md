@@ -3,6 +3,8 @@
 The site at [andres-al-campos.github.io](https://andres-al-campos.github.io). Static — no build step,
 no dependencies. Push to `main` and GitHub Pages serves it.
 
+`./build.sh` opens it in a browser; `./build.sh check` runs the laws in `laws/`.
+
 ## Adding a project
 
 Append an object to the array in `projects.js`. The page builds the cards from that
