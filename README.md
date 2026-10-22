@@ -1,9 +1,12 @@
 # Portfolio
 
+Updated 2026-10-22 02:03, at 1.0.0.
+
 The site at [andres-al-campos.github.io](https://andres-al-campos.github.io). Static — no build step,
 no dependencies. Push to `main` and GitHub Pages serves it.
 
-`./build.sh` opens it in a browser; `./build.sh check` runs the laws in `laws/`.
+`./build.sh` opens it in a browser and turns on the pre-commit hook that stamps the docs a
+commit changes; `./build.sh check` runs the laws in `laws/`.
 
 ## Adding a project
 

@@ -7,6 +7,8 @@
 
 set -e
 cd "$(dirname "$0")"
+# The pre-commit hook stamps the docs a commit changes (hooks/stamp-docs.mjs).
+git config core.hooksPath hooks
 
 case "${1:-open}" in
     open)
