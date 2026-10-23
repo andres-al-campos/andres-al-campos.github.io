@@ -7,7 +7,6 @@
 //   blurb     required — 1–3 sentences, what it does and why
 //   tags      required — short, lowercase-ish; shown as chips
 //   repo      required — full URL
-//   image     optional — path under img/. Not rendered: the card leads with its mark.
 //   video     optional — a short muted MP4 under img/, played while the card has attention
 //   poster    with video — a still taken from the clip
 //   posterAt  with video — the second the poster was taken at; a stopped clip rewinds there
