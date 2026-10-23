@@ -57,6 +57,9 @@ No check yet. Each clip is judged by watching it.
 - 2026-10-21 00:02, 1.0.0. While a tool works on the page in the background, the camera widens to the
   whole window so the work shows (Momus's scrape, with Google's review list scrolling by),
   then closes in on the tool when its results land. Applies *The tool at its best, as it is*.
+- 2026-10-23 18:54, 1.0.0. The continuous camera is for one app's flow, which plays as one shot. Between two
+  separate apps a cut is fine: in Chronicle, the export popup and the MCP in a terminal
+  are separate pieces.
 
 ## Gotchas
 
