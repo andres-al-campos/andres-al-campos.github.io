@@ -60,6 +60,10 @@ No check yet. Each clip is judged by watching it.
 - 2026-10-23 18:54, 1.0.0. The continuous camera is for one app's flow, which plays as one shot. Between two
   separate apps a cut is fine: in Chronicle, the export popup and the MCP in a terminal
   are separate pieces.
+- 2026-10-23 19:36, 1.0.0. Chronicle's clip shows what Chronicle does that Claude doesn't: a question answered from
+  the quarter and year entries, about how something changed over the year. Claude's own
+  past-chat search already answers "when did I decide X", so a single-chat recall would
+  undersell it. Applies *The tool at its best, as it is*.
 
 ## Gotchas
 
