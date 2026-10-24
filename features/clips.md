@@ -1,6 +1,6 @@
 # Demo clips
 
-Updated 2026-10-22 00:49, at 1.0.0.
+Updated 2026-10-24 17:18, at 1.0.0.
 
 The short recordings on each card (`img/<tool>.mp4`, with a poster `img/<tool>.jpg`
 and its time in `projects.js` as `posterAt`). Each is recorded live from the real app
@@ -65,6 +65,19 @@ No check yet. Each clip is judged by watching it.
   past-chat search already answers "when did I decide X", so a single-chat recall would
   undersell it. Applies *The tool at its best, as it is*.
 
+- 2026-10-24 17:18, 1.0.0. Chronicle's clip is narrated: a setup caption ("You freelance, and want to see
+  how your work changed this year") and then a numbered caption held through each step,
+  gone once the answer lands. Terminal text is small and goes by fast, so without them a
+  newcomer can't tell what's happening. Applies *Only the subject draws the eye*.
+- 2026-10-24 17:18, 1.0.0. A batch the demo runs all at once shows a few results, then cuts to its
+  finish: Chronicle's summaries and rollups for a whole year. In real use they run a
+  little at a time through the year, so a 289× badge over the whole run told the wrong
+  story. Applies *The tool at its best, as it is*.
+- 2026-10-24 17:18, 1.0.0. A wait for an answer speeds up until the answer's first frame, not until its
+  message is logged.
+- 2026-10-24 17:18, 1.0.0. Speed badges and captions sit 56 px above the bottom, the badge drawn 1.4×
+  its PNG; lower and smaller they were hard to see over a terminal's text.
+
 ## Gotchas
 
 - Clicks sent through Playwright don't move the browser's focus, so the address bar
@@ -76,3 +89,5 @@ No check yet. Each clip is judged by watching it.
   (minterpolate) smears scrolling text. Re-record at the pace the clip needs.
 - Chromium's download bubble re-shows recent downloads over a toolbar popup. Erase the
   download history (`chrome.downloads.erase({})`) before the take.
+- A click away from the recorded window shows in the take. Chronicle's edit finds the
+  stretches where the terminal's close button lost its colour and cuts them out.

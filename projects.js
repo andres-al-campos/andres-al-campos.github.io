@@ -65,6 +65,9 @@ const PROJECTS = [
       "A searchable archive of everything you have said to Claude, built on your own machine from an export of your history. Every conversation gets a markdown summary, and those roll up into half-month, quarter, and year entries, so a question about what you decided six months ago has somewhere to land. An MCP server lets an AI agent search and read it.",
     tags: ["Python", "MCP", "browser extension"],
     repo: "https://github.com/andres-al-campos/Chronicle",
+    video: "img/chronicle.mp4",
+    poster: "img/chronicle.jpg",
+    posterAt: 29.0,
   },
   {
     name: "Vault",
