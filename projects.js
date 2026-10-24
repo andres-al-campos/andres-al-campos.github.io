@@ -81,12 +81,12 @@ const PROJECTS = [
     posterAt: 3.2,
   },
   {
-    name: "Somnya",
-    tagline: "Sleep measured, not scored.",
+    name: "ReSign",
+    tagline: "Keep sideloaded iOS apps from expiring.",
     blurb:
-      "Lying awake looks identical to deep sleep on an accelerometer, so most sleep scores are confident about something they cannot know. Somnya senses movement, breathing, and heartbeat overnight, then labels every stat with how much it can stand behind it: sensor fact, honest estimate, or not enough data.",
-    tags: ["Swift", "iOS", "signal processing"],
-    repo: "https://github.com/andres-al-campos/Somnya",
+      "Sideloaded apps stop opening when their signature runs out, usually on the morning you need one. ReSign watches your Xcode projects from the menu bar and rebuilds and reinstalls to your iPhone two hours before that happens, and checks again every time the Mac wakes.",
+    tags: ["Swift", "macOS"],
+    repo: "https://github.com/andres-al-campos/ReSign",
   },
   {
     name: "Etymon",
@@ -100,11 +100,11 @@ const PROJECTS = [
     posterAt: 12.7,
   },
   {
-    name: "ReSign",
-    tagline: "Keep sideloaded iOS apps from expiring.",
+    name: "Somnya",
+    tagline: "Sleep measured, not scored.",
     blurb:
-      "Sideloaded apps stop opening when their signature runs out, usually on the morning you need one. ReSign watches your Xcode projects from the menu bar and rebuilds and reinstalls to your iPhone two hours before that happens, and checks again every time the Mac wakes.",
-    tags: ["Swift", "macOS"],
-    repo: "https://github.com/andres-al-campos/ReSign",
+      "Lying awake looks identical to deep sleep on an accelerometer, so most sleep scores are confident about something they cannot know. Somnya senses movement, breathing, and heartbeat overnight, then labels every stat with how much it can stand behind it: sensor fact, honest estimate, or not enough data.",
+    tags: ["Swift", "iOS", "signal processing"],
+    repo: "https://github.com/andres-al-campos/Somnya",
   },
 ];

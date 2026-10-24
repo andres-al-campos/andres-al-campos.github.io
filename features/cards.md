@@ -53,6 +53,9 @@ phone.
 - 2026-10-17 16:59, 1.0.0. The large view's clip holds still while it grows and shrinks, and plays
   once it lands. A card still under the pointer when the view shrinks back plays on from
   where the large view stopped. Applies *Only the subject draws the eye*.
+- 2026-10-24 18:18, 1.0.0. Somnya has no clip and sits last: it's still a work in progress and the
+  user doesn't like its UI as it stands. A clip of it would show the tool short of its
+  best. Applies *The tool at its best, as it is*.
 
 ## Gotchas
 
