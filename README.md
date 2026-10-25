@@ -1,7 +1,5 @@
 # Portfolio
 
-Updated 2026-10-22 02:03, at 1.0.0.
-
 The site at [andres-al-campos.github.io](https://andres-al-campos.github.io). Static — no build step,
 no dependencies. Push to `main` and GitHub Pages serves it.
 
