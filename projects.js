@@ -87,6 +87,12 @@ const PROJECTS = [
       "Sideloaded apps stop opening when their signature runs out, usually on the morning you need one. ReSign watches your Xcode projects from the menu bar and rebuilds and reinstalls to your iPhone two hours before that happens, and checks again every time the Mac wakes.",
     tags: ["Swift", "macOS"],
     repo: "https://github.com/andres-al-campos/ReSign",
+    slides: [
+      { src: "img/resign-1.jpg", caption: "Apps on a free Apple account stop opening 7 days after they're built. Ansa has a day left." },
+      { src: "img/resign-2.jpg", caption: "ReSign rebuilds it and reinstalls it on the iPhone." },
+      { src: "img/resign-3.jpg", caption: "Ansa is good for another 7 days. Left alone, ReSign does this 2 hours before expiry." },
+      { src: "img/resign-4.jpg", caption: "Set once: the folder it watches and the phone it installs to." },
+    ],
   },
   {
     name: "Etymon",
