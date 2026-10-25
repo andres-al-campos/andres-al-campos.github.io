@@ -1927,7 +1927,7 @@ addEventListener('click',e=>{
   taps=0;
   if(document.getElementById('wpanel')) return;
   const s=document.createElement('script');
-  s.src='water-panel.js';
+  s.src='assets/water-panel.js';
   document.head.appendChild(s);
 });
 
