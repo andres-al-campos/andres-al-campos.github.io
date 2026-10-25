@@ -1,6 +1,6 @@
 # Portfolio features
 
-Updated 2026-10-25 00:20, at 1.0.0.
+Updated 2026-10-25 12:08, at 1.0.0.
 
 What a visitor can do on the site, how to reach it, and the calls made about it. Read
 this before adding anything: if it's already here, extend it instead of building it
@@ -30,6 +30,6 @@ Before acting on a file, run `git log --since="<stamp time>"` on the code you're
 touch. Where it moved after the stamp, read the file against it and fix what's no longer
 true; the fix moves the stamp. A Call made before its subject changed goes to the owner,
 with the case in hand. `./build.sh` turns the hook on. `./build.sh check` (✓
-`doc-stamps`) fails when a feature file or the README has no stamp, a stamp, Principle or
+`doc-stamps`) fails when a feature file or this index has no stamp, a stamp, Principle or
 Call lacks a time and a version the site has had, or a Call cites a Principle that
 doesn't exist.
