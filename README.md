@@ -4,11 +4,11 @@ The site at [andres-al-campos.github.io](https://andres-al-campos.github.io). St
 no dependencies. Push to `main` and GitHub Pages serves it.
 
 `./build.sh` opens it in a browser and turns on the pre-commit hook that stamps the docs a
-commit changes; `./build.sh check` runs the laws in `laws/`.
+commit changes; `./build.sh check` runs the checks in `tests/`.
 
 ## Adding a project
 
-Append an object to the array in `projects.js`. The page builds the cards from that
+Append an object to the array in `assets/projects.js`. The page builds the cards from that
 array.
 
 ```js
@@ -44,8 +44,8 @@ ffmpeg -ss 3.2 -i img/thing.mp4 -frames:v 1 -vf scale=960:-2 -q:v 3 img/thing.jp
 ## Marks
 
 Each project card leads with a small hand-drawn mark instead of a screenshot. The marks
-live in `marks.js`, keyed by project name — one 32×32 viewBox, one stroke weight, two
-amber tones. A new project needs a matching entry there. `marks.js` is shared by the site
+live in `assets/marks.js`, keyed by project name — one 32×32 viewBox, one stroke weight, two
+amber tones. A new project needs a matching entry there. It's shared by the site
 and the local mockups, so edit it there, not in a copy.
 
 ## Local preview

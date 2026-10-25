@@ -1,9 +1,9 @@
 # Demo clips
 
-Updated 2026-10-24 17:18, at 1.0.0.
+Updated 2026-10-25 00:20, at 1.0.0.
 
 The short recordings on each card (`img/<tool>.mp4`, with a poster `img/<tool>.jpg`
-and its time in `projects.js` as `posterAt`). Each is recorded live from the real app
+and its time in `assets/projects.js` as `posterAt`). Each is recorded live from the real app
 and cut with ffmpeg; the scripts and takes live in `designs/<tool>-clip/`, which is
 gitignored.
 

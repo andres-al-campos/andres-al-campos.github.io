@@ -6,9 +6,9 @@ in a few seconds, and go to the code.
 ## Principles
 
 How the site ought to be, so a session can decide a case nobody has met yet. Each one
-earns its place by deciding Calls: the rulings in `features/`, which end by naming the
+earns its place by deciding Calls: the rulings in `dev/features/`, which end by naming the
 principle they apply. Listed in the order they were written; when two disagree on a
-case, the owner decides and the winner moves up. The hook in `hooks/` starts each with
+case, the owner decides and the winner moves up. The hook in `dev/hooks/` starts each with
 the time and the site's version (`VERSION`) when it was made or reworded.
 
 - 2026-10-22 02:03, 1.0.0. **The tool at its best, as it is.** A card shows the real tool at its best moment,

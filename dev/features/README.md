@@ -1,6 +1,6 @@
 # Portfolio features
 
-Updated 2026-10-22 02:03, at 1.0.0.
+Updated 2026-10-25 00:20, at 1.0.0.
 
 What a visitor can do on the site, how to reach it, and the calls made about it. Read
 this before adding anything: if it's already here, extend it instead of building it
@@ -14,7 +14,7 @@ again.
 ## Each file has
 
 - **A stamp** under the title: `Updated 2026-10-22 01:00, at 1.0.0.` When the description
-  last changed, and the site's version (`VERSION`) then. The pre-commit hook in `hooks/`
+  last changed, and the site's version (`VERSION`) then. The pre-commit hook in `dev/hooks/`
   writes it; a change only to the Calls leaves it alone.
 - **Sub-features**: what a visitor can do inside it, including limits.
 - **How to get to it**: the visitor's path.

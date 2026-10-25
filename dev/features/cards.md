@@ -1,6 +1,6 @@
 # Project cards
 
-Updated 2026-10-24 19:40, at 1.0.0.
+Updated 2026-10-25 00:20, at 1.0.0.
 
 The grid on the home page: one card per tool, with its name, what it does and a demo
 clip.
@@ -15,7 +15,7 @@ clip.
 - Clicking a clip opens the large view; on a phone it opens the system's full-screen
   player instead.
 - A tool with nothing to watch in real time has stills instead of a clip (`slides` in
-  `projects.js`). The card shows the first with a "1 / n" count at the bottom centre;
+  `assets/projects.js`). The card shows the first with a "1 / n" count at the bottom centre;
   clicking opens the large view, which pages with arrows, arrow keys, a click on the
   picture or a swipe, and shows each still's caption under it.
 
