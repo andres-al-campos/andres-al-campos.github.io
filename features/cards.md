@@ -68,6 +68,12 @@ phone.
 - 2026-10-24 19:40, 1.0.0. ReSign's stills keep the menu bar with every icon but its own blurred, and blur the
   scan path and the phone's name. Applies *Only the subject draws the eye*.
 
+- 2026-10-24 20:52, 1.0.0. The large view's arrows for stills sit either side of the picture, halfway down: bare
+  44 px chevrons, grey until hovered, hidden at the first and last still. Small arrows
+  under the caption were hard to find, and a circle around a big chevron added nothing;
+  this is how most image viewers do it. Applies *Theirs to use*.
+- 2026-10-24 20:52, 1.0.0. ReSign sits before Etymon.
+
 ## Gotchas
 
 - Back from the system's full screen, a clip has stopped wherever it was left, often on

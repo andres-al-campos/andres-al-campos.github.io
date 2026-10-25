@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Alex Campos — tools that help you find your way</title>
 <meta name="description" content="Small tools I built because I kept wishing they existed: a web browsing time manager, a tree-based to-do list, and an apartment review analyzer.">
-<link rel="stylesheet" href="style.css?v=26">
+<link rel="stylesheet" href="style.css?v=29">
 </head>
 <body>
 
@@ -38,7 +38,7 @@
 
 <script src="water.js?v=11"></script>
 <script src="marks.js?v=18"></script>
-<script src="projects.js?v=27"></script>
+<script src="projects.js?v=28"></script>
 <script>
 (function () {
   var grid = document.getElementById('grid');
@@ -251,15 +251,18 @@
   bar.appendChild(seek);
   bar.appendChild(clock);
 
-  // For stills: the picture, then a bar with the arrows either side of its
-  // caption and count.
+  // For stills: the picture with an arrow either side of it, halfway down,
+  // then its caption and count underneath.
+  var stage = el('div', 'vstage');
   var still = el('img', 'vimg');
   still.alt = '';
   var sbar = el('div', 'sbar');
-  var prev = el('button', 'sarrow', '←');
+  var prev = el('button', 'sarrow');
+  prev.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4 7 12l8 8"/></svg>';
   prev.type = 'button';
   prev.setAttribute('aria-label', 'Previous');
-  var next = el('button', 'sarrow', '→');
+  var next = el('button', 'sarrow');
+  next.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4l8 8-8 8"/></svg>';
   next.type = 'button';
   next.setAttribute('aria-label', 'Next');
   var scap = el('div', 'scap');
@@ -267,12 +270,13 @@
   var snum = el('span', 'snum');
   scap.appendChild(stext);
   scap.appendChild(snum);
-  sbar.appendChild(prev);
+  stage.appendChild(prev);
+  stage.appendChild(still);
+  stage.appendChild(next);
   sbar.appendChild(scap);
-  sbar.appendChild(next);
 
   viewer.appendChild(big);
-  viewer.appendChild(still);
+  viewer.appendChild(stage);
   viewer.appendChild(bar);
   viewer.appendChild(sbar);
   viewer.appendChild(shut);
@@ -347,6 +351,8 @@
     animate(shut, { opacity: [0, 0, 1] }, { duration: GROW });
     animate(bar, { opacity: [0, 0, 1] }, { duration: GROW });
     animate(sbar, { opacity: [0, 0, 1] }, { duration: GROW });
+    animate(prev, { opacity: [0, 0, 1] }, { duration: GROW });
+    animate(next, { opacity: [0, 0, 1] }, { duration: GROW });
   }
 
   function shrink() {
@@ -361,6 +367,8 @@
     animate(shut, { opacity: [1, 0] }, { duration: 120, fill: 'forwards' });
     animate(bar, { opacity: [1, 0] }, { duration: 120, fill: 'forwards' });
     animate(sbar, { opacity: [1, 0] }, { duration: 120, fill: 'forwards' });
+    animate(prev, { opacity: [1, 0] }, { duration: 120, fill: 'forwards' });
+    animate(next, { opacity: [1, 0] }, { duration: 120, fill: 'forwards' });
     if (!a) { viewer.close(); return; }
     a.onfinish = function () {
       var t = big.currentTime;

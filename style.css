@@ -381,7 +381,11 @@ main {
 
 /* The viewer shows a clip or a set of stills, each with its own bar. */
 .viewer.slides video, .viewer.slides .vbar,
-.viewer:not(.slides) .vimg, .viewer:not(.slides) .sbar { display: none; }
+.viewer:not(.slides) .vstage, .viewer:not(.slides) .sbar { display: none; }
+
+/* Stills leave room either side of the picture for the arrows. */
+.viewer.slides { width: min(1280px, calc(94vw - 144px), calc((86vh - 40px) * 1.6)); }
+.vstage { position: relative; }
 
 .sbar {
   display: flex;
@@ -391,20 +395,37 @@ main {
 }
 
 .sarrow {
-  flex: none;
-  width: 36px;
-  height: 36px;
+  position: absolute;
+  top: 50%;
+  width: 56px;
+  height: 72px;
+  margin-top: -36px;
   padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
+  border: 0;
   background: none;
-  color: var(--ink);
-  font-size: 18px;
+  color: var(--soft);
   cursor: pointer;
+  transition: color .15s;
 }
 
-.sarrow:disabled { color: var(--faint); border-color: transparent; cursor: default; }
-.sarrow:not(:disabled):hover { border-color: color-mix(in srgb, var(--amber) 38%, var(--line)); }
+.sarrow svg {
+  display: block;
+  width: 44px;
+  height: 44px;
+  margin: auto;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .5));
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sarrow:first-child { left: -68px; }
+.sarrow:last-child { right: -68px; }
+
+.sarrow:disabled { visibility: hidden; }
+.sarrow:hover { color: var(--ink); }
 .sarrow:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
 
 .scap {
