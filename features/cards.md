@@ -1,6 +1,6 @@
 # Project cards
 
-Updated 2026-10-22 00:49, at 1.0.0.
+Updated 2026-10-24 19:40, at 1.0.0.
 
 The grid on the home page: one card per tool, with its name, what it does and a demo
 clip.
@@ -14,6 +14,10 @@ clip.
   Tablets with two across keep the poster. Reduced motion keeps the poster everywhere.
 - Clicking a clip opens the large view; on a phone it opens the system's full-screen
   player instead.
+- A tool with nothing to watch in real time has stills instead of a clip (`slides` in
+  `projects.js`). The card shows the first with a "1 / n" count at the bottom centre;
+  clicking opens the large view, which pages with arrows, arrow keys, a click on the
+  picture or a swipe, and shows each still's caption under it.
 
 ## How to get to it
 
@@ -56,6 +60,13 @@ phone.
 - 2026-10-24 18:18, 1.0.0. Somnya has no clip and sits last: it's still a work in progress and the
   user doesn't like its UI as it stands. A clip of it would show the tool short of its
   best. Applies *The tool at its best, as it is*.
+
+- 2026-10-24 19:40, 1.0.0. ReSign gets stills, not a clip: its work happens unseen, and a still per state (a day
+  left, rebuilding, rebuilt, settings) says it as well. Paging happens only in the large
+  view, since small stills on a card aren't worth flipping through; the count sits at
+  the bottom centre so it's seen. Applies *Theirs to use*.
+- 2026-10-24 19:40, 1.0.0. ReSign's stills keep the menu bar with every icon but its own blurred, and blur the
+  scan path and the phone's name. Applies *Only the subject draws the eye*.
 
 ## Gotchas
 

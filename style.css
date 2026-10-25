@@ -325,6 +325,22 @@ main {
 /* No hover to reveal it on a touch screen, so the cue is always there. */
 @media (hover: none) { .expand { opacity: .9; } }
 
+/* A card of stills says how many there are, at the bottom centre where it's
+   seen without hunting for it. */
+.scount {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(11, 13, 18, .72);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: 500 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---- viewer ---- */
 
 .viewer {
@@ -349,6 +365,60 @@ main {
   background: #000;
   box-shadow: var(--card-lift);
 }
+
+.vimg {
+  display: block;
+  cursor: pointer;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: contain;
+  border-radius: 10px;
+  background: var(--chip);
+  box-shadow: var(--card-lift);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* The viewer shows a clip or a set of stills, each with its own bar. */
+.viewer.slides video, .viewer.slides .vbar,
+.viewer:not(.slides) .vimg, .viewer:not(.slides) .sbar { display: none; }
+
+.sbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px 0;
+}
+
+.sarrow {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.sarrow:disabled { color: var(--faint); border-color: transparent; cursor: default; }
+.sarrow:not(:disabled):hover { border-color: color-mix(in srgb, var(--amber) 38%, var(--line)); }
+.sarrow:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+.scap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.stext { margin: 0; color: var(--ink); font-size: 14.5px; line-height: 1.45; }
+.snum { flex: none; color: var(--soft); font: 500 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
 
 /* The viewer's controls sit under the picture, never on it. */
 .vbar {
