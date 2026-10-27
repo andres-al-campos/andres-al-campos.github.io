@@ -4,6 +4,7 @@
 #   ./build.sh          Open the site in the default browser. It's static, so no
 #                       server is needed; GitHub Pages serves main as it is.
 #   ./build.sh check    Run every check in tests/ (rules a bug once broke).
+#   ./build.sh check --drives  The same, plus the drives (none yet).
 
 set -e
 cd "$(dirname "$0")"
@@ -22,6 +23,11 @@ case "${1:-open}" in
         for t in tests/*.mjs; do node "$t" || failed=1; done
         [ "$failed" = 0 ] || { echo "❌ A check failed. Each message above says what broke and how to fix it."; exit 1; }
         echo "✅ All checks pass."
+        case "${2:-}" in
+            "") ;;
+            --drives) echo "No drives yet, so check --drives ran the same checks." ;;
+            *) echo "❌ Unknown option '$2'. Use ./build.sh check or ./build.sh check --drives."; exit 1 ;;
+        esac
         ;;
     *)
         echo "❌ Unknown option '$1'. Use: ./build.sh (open the site) or ./build.sh check"
