@@ -2,3 +2,6 @@
 mockups/
 designs/
 _aliasing-demo.html
+
+# Process, not product: mockups and per-quest plans stay on disk, off the remote
+plans/
