@@ -1,16 +1,16 @@
 # Demo clips
 
-Updated 2026-11-13 22:16, at 1.0.0.
+Updated 2026-11-13 22:17, at 1.0.0.
 
 The short recordings on each card (`img/<tool>.mp4`, with a poster `img/<tool>.jpg`
 and its time in `assets/projects.js` as `posterAt`). Each is recorded live from the real app
-and cut with ffmpeg; the scripts and takes live in `designs/<tool>-clip/`, which is
+(Sundial's beside a room rendered from its values) and cut with ffmpeg; the scripts and takes live in `designs/<tool>-clip/`, which is
 gitignored.
 
 ## Sub-features
 
 - A clip shows a tool's main use in 20 to 30 seconds, muted, with a drawn pointer.
-- Sped-up stretches carry a speed badge.
+- Sped-up stretches carry a speed badge, or a clock where the time of day is the point.
 
 ## How to get to it
 
