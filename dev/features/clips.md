@@ -1,6 +1,6 @@
 # Demo clips
 
-Updated 2026-10-25 00:20, at 1.0.0.
+Updated 2026-11-13 22:16, at 1.0.0.
 
 The short recordings on each card (`img/<tool>.mp4`, with a poster `img/<tool>.jpg`
 and its time in `assets/projects.js` as `posterAt`). Each is recorded live from the real app
@@ -91,3 +91,21 @@ No check yet. Each clip is judged by watching it.
   download history (`chrome.downloads.erase({})`) before the take.
 - A click away from the recorded window shows in the take. Chronicle's edit finds the
   stretches where the terminal's close button lost its colour and cuts them out.
+- Sundial's clip sets the real app beside a rendered room that it lights: the monitor, a
+  desk lamp and a floor lamp. A screen recording can't show what the app does, which is
+  change the light in a room. Applies *The tool at its best, as it is*.
+- The rendered room takes its timing from the recording, measured a frame at a time
+  (slider fills, the playhead's position), never from guessed timings. Guessed, the
+  monitor lagged its sliders and the room's clock trailed the playhead by 10 to 15
+  minutes, and both read as out of sync. Applies *The tool at its best, as it is*.
+- Rendered effects are tuned to read as real, close to the app's values but not exact.
+  The lamp's level maps straight from the app's (57% stays 57%, the 21% midnight key
+  shows as 12%), so the last hours visibly dim the way the schedule does. The 1500 K
+  night key shows as 1800 K, since exact it read as red. Stars drift at a twentieth of
+  the sky's real pace: at the real one they crossed the window and took the eye off the
+  lamp. Applies *Only the subject draws the eye*.
+- When Sundial plays the day, the room shows a clock at the bottom right instead of a
+  speed badge: the time says where in the evening it is, which a speed can't.
+- Sundial's clip is captioned for someone who has never heard of it: one short sentence
+  each, in the empty space under the app, held about 1.5 s or longer and matched to the
+  beat on screen. Applies *Only the subject draws the eye*.

@@ -106,11 +106,14 @@ const PROJECTS = [
     ],
   },
   {
-    name: "Somnya",
-    tagline: "Sleep measured, not scored.",
+    name: "Sundial",
+    tagline: "Room light that follows the sun, then sets at your bedtime.",
     blurb:
-      "Lying awake looks identical to deep sleep on an accelerometer, so most sleep scores are confident about something they cannot know. Somnya senses movement, breathing, and heartbeat overnight, then labels every stat with how much it can stand behind it: sensor fact, honest estimate, or not enough data.",
-    tags: ["Swift", "iOS", "signal processing"],
-    repo: "https://github.com/andres-al-campos/Somnya",
+      "A menu bar app that drives your monitor's hardware brightness, contrast and Night Shift, and your Philips Hue lamps. By day it scales the screen to the room's light through the Mac's light sensor; after dark it runs an artificial sunset that ends at bedtime. Each lamp gets a day of color keys, and a key pinned to sunset moves with the seasons.",
+    tags: ["Swift", "macOS", "DDC", "Philips Hue"],
+    repo: "https://github.com/andres-al-campos/Sundial",
+    video: "img/sundial.mp4",
+    poster: "img/sundial.jpg",
+    posterAt: 21.0,
   },
 ];
