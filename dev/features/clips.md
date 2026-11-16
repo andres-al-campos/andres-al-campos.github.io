@@ -1,6 +1,6 @@
 # Demo clips
 
-Updated 2026-11-13 22:17, at 1.0.0.
+Updated 2026-11-16 03:02, at 1.0.0.
 
 The short recordings on each card (`img/<tool>.mp4`, with a poster `img/<tool>.jpg`
 and its time in `assets/projects.js` as `posterAt`). Each is recorded live from the real app
@@ -103,7 +103,7 @@ No check yet. Each clip is judged by watching it.
   shows as 12%), so the last hours visibly dim the way the schedule does. The 1500 K
   night key shows as 1800 K, since exact it read as red. Stars drift at a twentieth of
   the sky's real pace: at the real one they crossed the window and took the eye off the
-  lamp. Applies *Only the subject draws the eye*.
+  lamp. A one-off: few of the tools act on anything outside the computer. Applies *Only the subject draws the eye*.
 - When Sundial plays the day, the room shows a clock at the bottom right instead of a
   speed badge: the time says where in the evening it is, which a speed can't.
 - Sundial's clip is captioned for someone who has never heard of it: one short sentence
