@@ -1,4 +1,4 @@
-// Every clip, poster and still a card names is in the repo, and every clip has a poster and the
+// Lint: every clip, poster and still a card names is in the repo, and every clip has a poster and the
 // second it was taken at. A missing file shows as an empty card only on the live site, where
 // nothing reports it.
 import fs from 'node:fs';
