@@ -23,3 +23,8 @@ the time and the site's version (`VERSION`) when it was made or reworded.
   one link on a thing is marked where it is, the rest selects like text, and where the
   platform's own tool does it better, theirs wins. Bad design feels like fighting the
   controls; the reader should only be dealing with the tool they came to see.
+- 2026-11-19 22:07, 1.0.0. **The hero is one moment under a tree.** Looking toward the sun from beneath a tree
+  while the grass moves in a summer breeze. A choice in the hero stays if it's how that
+  moment looks and feels, which outranks both realism and prettiness. Calm has no object
+  to show, but that moment has the feeling "One less thing" means: the ease that comes
+  once small blockers you didn't notice are gone.
